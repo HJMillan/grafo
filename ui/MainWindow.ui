@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1100</width>
+    <height>650</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Caminos más cortos</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QFrame" name="frameGraph">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>10</y>
+      <width>800</width>
+      <height>500</height>
+     </rect>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::Box</enum>
+    </property>
+   </widget>
+   <widget class="QTextEdit" name="txtOutput">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>520</y>
+      <width>800</width>
+      <height>110</height>
+     </rect>
+    </property>
+    <property name="readOnly">
+     <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QGroupBox" name="grpAlgoritmo">
+    <property name="geometry">
+     <rect>
+      <x>830</x>
+      <y>10</y>
+      <width>250</width>
+      <height>140</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Algoritmo</string>
+    </property>
+    <widget class="QRadioButton" name="rbtnDijkstra">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>20</y>
+       <width>100</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Dijkstra</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="rbtnBellman">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>45</y>
+       <width>120</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Bellman-Ford</string>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="rbtnFloyd">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>70</y>
+       <width>120</width>
+       <height>22</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Floyd-Warshall</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnCalculate">
+     <property name="geometry">
+      <rect>
+       <x>140</x>
+       <y>30</y>
+       <width>100</width>
+       <height>30</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Calcular</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QGroupBox" name="grpGrafo">
+    <property name="geometry">
+     <rect>
+      <x>830</x>
+      <y>150</y>
+      <width>250</width>
+      <height>70</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Grafo</string>
+    </property>
+    <widget class="QCheckBox" name="chkDirected">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>30</y>
+       <width>180</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Grafo dirigido</string>
+     </property>
+    </widget>
+   </widget>
+         <widget class="QGroupBox" name="grpNodos">
+    <property name="geometry">
+     <rect>
+      <x>830</x>
+      <y>230</y>
+      <width>250</width>
+      <height>170</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Nodos</string>
+    </property>
+    <widget class="QLabel" name="lblNodeName">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>200</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Nombre (Aa != aa):</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="txtNodeName">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>32</y>
+       <width>130</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="placeholderText">
+      <string>Nombre</string>
+     </property>
+    </widget>
+    <widget class="QCheckBox" name="chkUppercase">
+     <property name="geometry">
+      <rect>
+       <x>150</x>
+       <y>34</y>
+       <width>80</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Mayus</string>
+     </property>
+     <property name="toolTip">
+      <string>Solo afecta al nombre sugerido cuando el campo esta vacio. Los nombres ingresados se respetan tal cual (sensible a mayusculas).</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnAddNode">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>68</y>
+       <width>110</width>
+       <height>28</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Agregar nodo</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnRemoveLast">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>68</y>
+       <width>100</width>
+       <height>28</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Borrar ultimo</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnClearAll">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>104</y>
+       <width>220</width>
+       <height>28</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Borrar todos</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QGroupBox" name="grpCaminos">
+    <property name="geometry">
+     <rect>
+      <x>830</x>
+      <y>410</y>
+      <width>250</width>
+      <height>150</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Caminos</string>
+    </property>
+    <widget class="QLabel" name="labelEdgeFrom">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>25</y>
+       <width>50</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Origen</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="cbEdgeFrom">
+     <property name="geometry">
+      <rect>
+       <x>70</x>
+       <y>20</y>
+       <width>80</width>
+       <height>24</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="labelEdgeTo">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>55</y>
+       <width>50</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Destino</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="cbEdgeTo">
+     <property name="geometry">
+      <rect>
+       <x>70</x>
+       <y>50</y>
+       <width>80</width>
+       <height>24</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="labelWeight">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>85</y>
+       <width>50</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Peso</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="txtWeight">
+     <property name="geometry">
+      <rect>
+       <x>70</x>
+       <y>80</y>
+       <width>80</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>1</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="btnAddEdge">
+     <property name="geometry">
+      <rect>
+       <x>160</x>
+       <y>48</y>
+       <width>80</width>
+       <height>28</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Agregar</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QGroupBox" name="grpConsulta">
+    <property name="geometry">
+     <rect>
+      <x>830</x>
+      <y>570</y>
+      <width>250</width>
+      <height>70</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Origen/Destino</string>
+    </property>
+    <widget class="QComboBox" name="cbOrigin">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>25</y>
+       <width>110</width>
+       <height>24</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="cbDestination">
+     <property name="geometry">
+      <rect>
+       <x>130</x>
+       <y>25</y>
+       <width>110</width>
+       <height>24</height>
+      </rect>
+     </property>
+    </widget>
+   </widget>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
+
+
+
+
+
