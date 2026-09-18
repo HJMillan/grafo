@@ -1,26 +1,42 @@
 #include "GraphWidget.h"
-#include <QPen>
-#include <QFont>
+#include "GraphConstants.h"
+#include "GraphFormat.h"
+
+#include <QEvent>
 #include <QFontMetrics>
+#include <QKeyEvent>
+#include <QMouseEvent>
+#include <QPainter>
 #include <QPainterPath>
-#include <QtMath>
+#include <QPen>
+#include <QRadialGradient>
+#include <QResizeEvent>
 #include <QtGlobal>
+#include <QtMath>
+#include <cmath>
 
 GraphWidget::GraphWidget(QWidget *parent) : QFrame(parent) {
-    setStyleSheet("background-color: blue; border: 1px solid #1E4370;");
-    setFrameShape(QFrame::Box);
+    setFrameShape(QFrame::NoFrame);
     setAttribute(Qt::WA_OpaquePaintEvent);
+    setMouseTracking(true);
+    setCursor(Qt::CrossCursor);
+    setFocusPolicy(Qt::StrongFocus);
 }
 
-void GraphWidget::addNodeVisual(const QString &name, const QPoint &pos) {
-    nodes.append({name, pos});
-    update();
+void GraphWidget::clampIndex(int &index) const {
+    if (index >= nodes.size()) index = -1;
 }
 
-void GraphWidget::removeLastNode() {
-    if (!nodes.isEmpty()) nodes.removeLast();
-    edges.clear();
-    highlightedPairs.clear();
+void GraphWidget::setNodes(const QVector<QString> &names, const QVector<QPoint> &positions) {
+    const int count = qMin(names.size(), positions.size());
+    nodes.resize(count);
+    for (int i = 0; i < count; ++i) nodes[i] = {names[i], positions[i]};
+
+    clampIndex(selectedNode);
+    clampIndex(hoverNode);
+    clampIndex(originNode);
+    clampIndex(destNode);
+    clampIndex(draggedNode);
     update();
 }
 
@@ -28,7 +44,75 @@ void GraphWidget::clearAll() {
     nodes.clear();
     edges.clear();
     highlightedPairs.clear();
+    highlightedNodes.clear();
+    draggedNode = -1;
+    dragDidMove = false;
+    selectedNode = -1;
+    hoverNode = -1;
+    originNode = -1;
+    destNode = -1;
     update();
+}
+
+void GraphWidget::clearSelection() {
+    if (selectedNode < 0) return;
+    selectedNode = -1;
+    update();
+}
+
+void GraphWidget::setQueryEndpoints(int origin, int dest) {
+    const int nextOrigin = (origin >= 0 && origin < nodes.size()) ? origin : -1;
+    const int nextDest = (dest >= 0 && dest < nodes.size()) ? dest : -1;
+    if (nextOrigin == originNode && nextDest == destNode) return;
+    originNode = nextOrigin;
+    destNode = nextDest;
+    update();
+}
+
+QVector<QPoint> GraphWidget::nodePositions() const {
+    QVector<QPoint> out;
+    out.reserve(nodes.size());
+    for (const Node &n : nodes) out.append(n.pos);
+    return out;
+}
+
+void GraphWidget::restoreNodes(const QVector<QString> &names, const QVector<QPoint> &positions) {
+    edges.clear();
+    highlightedPairs.clear();
+    highlightedNodes.clear();
+    draggedNode = -1;
+    dragDidMove = false;
+    selectedNode = -1;
+    hoverNode = -1;
+    originNode = -1;
+    destNode = -1;
+    setNodes(names, positions);
+}
+
+QPoint GraphWidget::placeWithoutOverlap(QPoint p) const {
+    p = clampToCanvas(p);
+    const int minDist = nodeSeparation;
+    const int minSq = minDist * minDist;
+
+    auto overlaps = [&](const QPoint &candidate) {
+        for (const Node &n : nodes) {
+            const QPoint d = candidate - n.pos;
+            if (d.x() * d.x() + d.y() * d.y() < minSq) return true;
+        }
+        return false;
+    };
+
+    if (!overlaps(p)) return p;
+
+    for (int attempt = 1; attempt <= 48; ++attempt) {
+        const double angle = attempt * 0.6180339887 * 2.0 * M_PI;
+        const int radius = minDist + (attempt / 6) * 10;
+        const QPoint next = clampToCanvas(QPoint(
+                p.x() + static_cast<int>(radius * std::cos(angle)),
+                p.y() + static_cast<int>(radius * std::sin(angle))));
+        if (!overlaps(next)) return next;
+    }
+    return p;
 }
 
 void GraphWidget::setAdjacency(const QVector<QVector<double>> &adj, int nodeCount, double inf, bool directed) {
@@ -38,13 +122,12 @@ void GraphWidget::setAdjacency(const QVector<QVector<double>> &adj, int nodeCoun
 
     QVector<QVector<bool>> used(nodeCount, QVector<bool>(nodeCount, false));
 
-    // reconstruir aristas; si es dirigido y existe ida/vuelta, combinamos en una sola con ambos pesos
     for (int i = 0; i < nodeCount; ++i) {
         for (int j = 0; j < nodeCount; ++j) {
-            if (adj[i][j] >= inf / 2) continue;
+            if (GraphConstants::isMissing(adj[i][j], inf)) continue;
             if (used[i][j]) continue;
             if (!directed) {
-                if (j <= i) continue; // evitar duplicar en no dirigido
+                if (j < i) continue;
                 edges.append({i, j, adj[i][j], false, false, 0.0});
             } else {
                 if (i == j) {
@@ -52,8 +135,8 @@ void GraphWidget::setAdjacency(const QVector<QVector<double>> &adj, int nodeCoun
                     used[i][j] = true;
                     continue;
                 }
-                bool hasRev = (j < nodeCount && adj[j][i] < inf / 2);
-                double revW = hasRev ? adj[j][i] : 0.0;
+                const bool hasRev = (j < nodeCount && !GraphConstants::isMissing(adj[j][i], inf));
+                const double revW = hasRev ? adj[j][i] : 0.0;
                 edges.append({i, j, adj[i][j], true, hasRev, revW});
                 used[i][j] = true;
                 if (hasRev) used[j][i] = true;
@@ -65,18 +148,129 @@ void GraphWidget::setAdjacency(const QVector<QVector<double>> &adj, int nodeCoun
 
 void GraphWidget::highlightPath(const QVector<int> &path) {
     highlightedPairs.clear();
+    highlightedNodes = path;
     if (path.size() < 2) { update(); return; }
     for (int i = 0; i + 1 < path.size(); ++i) {
-        highlightedPairs.append({path[i], path[i+1]});
+        highlightedPairs.append({path[i], path[i + 1]});
     }
     update();
 }
 
-void GraphWidget::highlightPath(const QVector<int> &path, const QVector<QVector<double>> &adj, double inf, bool directed) {
-    Q_UNUSED(adj);
-    Q_UNUSED(inf);
-    directedEdges = directed;
-    highlightPath(path);
+int GraphWidget::nodeAt(const QPoint &p) const {
+    for (int i = nodes.size() - 1; i >= 0; --i) {
+        const QPoint d = p - nodes[i].pos;
+        if (d.x() * d.x() + d.y() * d.y() <= nodeRadius * nodeRadius) return i;
+    }
+    return -1;
+}
+
+QPoint GraphWidget::clampToCanvas(const QPoint &p) const {
+    const QRect r = rect().adjusted(nodeRadius + 8, nodeRadius + 8, -nodeRadius - 8, -nodeRadius - 8);
+    if (r.width() <= 0 || r.height() <= 0) return p;
+    return QPoint(qBound(r.left(), p.x(), r.right()), qBound(r.top(), p.y(), r.bottom()));
+}
+
+void GraphWidget::drawEmptyState(QPainter &g) const {
+    QFont titleFont = Theme::headline();
+    titleFont.setPointSizeF(15.0);
+    QFont captionFont = Theme::caption();
+
+    const QString title = QStringLiteral("El lienzo está vacío");
+    const QString caption = QStringLiteral("Clic para crear un nodo · clic en dos nodos para unirlos");
+
+    QFontMetrics titleFm(titleFont);
+    QFontMetrics captionFm(captionFont);
+    const int blockHeight = titleFm.height() + 6 + captionFm.height();
+    const int top = rect().center().y() - blockHeight / 2;
+
+    g.setFont(titleFont);
+    g.setPen(Theme::emptyStateLabel());
+    g.drawText(QRect(20, top, width() - 40, titleFm.height()),
+               Qt::AlignHCenter | Qt::AlignVCenter, title);
+
+    g.setFont(captionFont);
+    g.setPen(Theme::emptyStateCaption());
+    g.drawText(QRect(20, top + titleFm.height() + 6, width() - 40, captionFm.height()),
+               Qt::AlignHCenter | Qt::AlignVCenter, caption);
+}
+
+void GraphWidget::drawNode(QPainter &g, int index) const {
+    const Node &n = nodes[index];
+    QRectF circle(n.pos.x() - nodeRadius, n.pos.y() - nodeRadius,
+                  nodeRadius * 2, nodeRadius * 2);
+
+    const bool onPath = highlightedNodes.contains(index);
+    const bool dragging = (index == draggedNode);
+    const bool selected = (index == selectedNode);
+    const bool hovered = (index == hoverNode);
+    const bool isQuery = (index == originNode || index == destNode);
+
+    QColor base = Theme::nodeFill();
+    if (isQuery) {
+        const QColor accent = Theme::accent();
+        base = QColor((accent.red() + base.red() * 2) / 3,
+                      (accent.green() + base.green() * 2) / 3,
+                      (accent.blue() + base.blue() * 2) / 3);
+    }
+    QRadialGradient radial(n.pos, nodeRadius);
+    radial.setColorAt(0.0, base.lighter(105));
+    radial.setColorAt(0.7, base);
+    radial.setColorAt(1.0, base.darker(107));
+
+    QColor stroke = Theme::nodeStroke();
+    int strokeW = 2;
+    if (dragging || selected) {
+        stroke = Theme::accent();
+        strokeW = 3;
+    } else if (onPath) {
+        stroke = Theme::edgeHighlight();
+        strokeW = 3;
+    } else if (hovered) {
+        stroke = Theme::accent();
+        strokeW = 2;
+    }
+
+    g.setPen(QPen(stroke, strokeW));
+    g.setBrush(radial);
+    g.drawEllipse(circle);
+
+    g.setPen(Theme::nodeLabel());
+    g.setFont(Theme::headline());
+    g.drawText(circle, Qt::AlignCenter, n.name);
+}
+
+void GraphWidget::drawQueryBadge(QPainter &g, int index, const QString &text) const {
+    if (index < 0 || index >= nodes.size()) return;
+
+    QFont font = Theme::caption();
+    QFontMetrics fm(font);
+    const QSize ts = fm.size(Qt::TextSingleLine, text);
+    const int pad = 6;
+    QRect pill(0, 0, ts.width() + pad * 2, ts.height() + 4);
+    pill.moveCenter(QPoint(nodes[index].pos.x(), nodes[index].pos.y() + nodeRadius + 14));
+
+    QPainterPath pillPath;
+    pillPath.addRoundedRect(pill, 8, 8);
+    g.setPen(Qt::NoPen);
+    g.setBrush(Theme::pillFill());
+    g.drawPath(pillPath);
+
+    g.setPen(QPen(Theme::accent(), 1));
+    g.setBrush(Qt::NoBrush);
+    g.drawPath(pillPath);
+
+    g.setPen(Theme::pillLabel());
+    g.setFont(font);
+    g.drawText(pill, Qt::AlignCenter, text);
+}
+
+void GraphWidget::drawQueryBadges(QPainter &g) const {
+    if (originNode >= 0 && originNode == destNode) {
+        drawQueryBadge(g, originNode, QStringLiteral("Origen y destino"));
+        return;
+    }
+    if (originNode >= 0) drawQueryBadge(g, originNode, QStringLiteral("Origen"));
+    if (destNode >= 0) drawQueryBadge(g, destNode, QStringLiteral("Destino"));
 }
 
 void GraphWidget::paintEvent(QPaintEvent *event) {
@@ -84,20 +278,32 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
     QPainter g(this);
     g.setRenderHint(QPainter::Antialiasing, true);
     g.setRenderHint(QPainter::TextAntialiasing, true);
-    g.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    g.fillRect(rect(), QColor("#0b0f14"));
+    QPainterPath clip;
+    clip.addRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 16, 16);
+    g.setClipPath(clip);
+    g.fillRect(rect(), Theme::canvasBackground());
 
-    const QColor edgeColor(225,230,238);
-    const QColor edgeHiColor("#00B2A9");
+    if (nodes.isEmpty()) {
+        drawEmptyState(g);
+        return;
+    }
+
+    drawEdges(g);
+    drawLinkPreview(g);
+    drawNodes(g);
+    drawQueryBadges(g);
+}
+
+void GraphWidget::drawEdges(QPainter &g) const {
+    const QColor edgeColor = Theme::edge();
+    const QColor edgeHiColor = Theme::edgeHighlight();
     const int edgeW = 2;
     const int edgeHiW = 4;
 
-    QFont wFont = g.font();
-    wFont.setPointSizeF(12.0);
+    QFont wFont = Theme::caption();
     QFontMetrics wfm(wFont);
 
-    // Aristas
     for (const Edge &e : edges) {
         if (e.from >= nodes.size() || e.to >= nodes.size()) continue;
         const Node &a = nodes[e.from];
@@ -112,10 +318,10 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
         if (hi) {
             QPen glow(edgeHiColor);
             glow.setWidth(edgeHiW + 6);
-            QColor glowC = edgeHiColor; glowC.setAlpha(60);
+            QColor glowC = edgeHiColor;
+            glowC.setAlpha(60);
             glow.setColor(glowC);
             glow.setCapStyle(Qt::RoundCap);
-            glow.setJoinStyle(Qt::RoundJoin);
             g.setPen(glow);
             if (selfLoop) {
                 QRect loopRect(a.pos.x() - nodeRadius - 12, a.pos.y() - nodeRadius - 22,
@@ -168,83 +374,165 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
         QLineF line(a.pos, b.pos);
         const qreal len = line.length();
         const QPointF mid = line.pointAt(0.5);
-        QPointF n(0,0.5);
-        if (len > 0.0001) n = QPointF(-line.dy()/len, line.dx()/len);
+        QPointF n(0, 0.5);
+        if (len > 0.0001) n = QPointF(-line.dy() / len, line.dx() / len);
 
         QString txt;
         if (selfLoop) {
-            txt = QString("%1->%1=%2")
+            txt = QString("%1→%1  %2")
                     .arg(nodes[e.from].name)
-                    .arg(e.weight, 0, 'f', 2);
+                    .arg(formatWeight(e.weight));
         } else if (e.directed && e.hasReverse) {
-            txt = QString("%1->%2=%3 / %2->%1=%4")
+            txt = QString("%1→%2  %3   %2→%1  %4")
                     .arg(nodes[e.from].name)
                     .arg(nodes[e.to].name)
-                    .arg(e.weight, 0, 'f', 2)
-                    .arg(e.reverseWeight, 0, 'f', 2);
+                    .arg(formatWeight(e.weight), formatWeight(e.reverseWeight));
         } else {
-            txt = QString::number(e.weight, 'f', 2);
+            txt = formatWeight(e.weight);
         }
-        const QSize ts  = wfm.size(Qt::TextSingleLine, txt);
+        const QSize ts = wfm.size(Qt::TextSingleLine, txt);
         const int pad = 7;
         const int radius = 10;
 
-        QRect pill(0, 0, ts.width() + pad*2, ts.height() + pad);
+        QRect pill(0, 0, ts.width() + pad * 2, ts.height() + pad);
         if (selfLoop) {
             pill.moveCenter(QPoint(a.pos.x(), a.pos.y() - nodeRadius - 28));
         } else {
             pill.moveCenter((mid + n * 16.0).toPoint());
         }
 
-        QPainterPath shadowPath;
-        shadowPath.addRoundedRect(pill.adjusted(1, 1, 1, 1), radius, radius);
-        g.setPen(Qt::NoPen);
-        g.setBrush(QColor(0, 0, 0, 90));
-        g.drawPath(shadowPath);
-
         QPainterPath pillPath;
         pillPath.addRoundedRect(pill, radius, radius);
-        g.setBrush(QColor(10, 10, 10, 150));
+        g.setPen(Qt::NoPen);
+        g.setBrush(Theme::pillFill());
         g.drawPath(pillPath);
 
-        QColor border = hi ? edgeHiColor : QColor(255,255,255,40);
-        QPen pillPen(border, 1);
+        QPen pillPen(hi ? edgeHiColor : Theme::pillStroke(), 1);
         g.setPen(pillPen);
         g.setBrush(Qt::NoBrush);
         g.drawPath(pillPath);
 
-        g.setPen(QColor(245,247,255));
+        g.setPen(Theme::pillLabel());
         g.setFont(wFont);
         g.drawText(pill, Qt::AlignCenter, txt);
     }
+}
 
-    // Nodos
-    QFont nFont = g.font();
-    nFont.setBold(true);
-    nFont.setPointSizeF(11.0);
-    g.setFont(nFont);
+void GraphWidget::drawLinkPreview(QPainter &g) const {
+    if (selectedNode < 0 || selectedNode >= nodes.size() || draggedNode >= 0) return;
 
-    for (const Node &n : nodes) {
-        QRectF circle(n.pos.x() - nodeRadius, n.pos.y() - nodeRadius,
-                      nodeRadius * 2, nodeRadius * 2);
+    QPoint end = cursorPos;
+    if (hoverNode >= 0 && hoverNode != selectedNode) end = nodes[hoverNode].pos;
+    QPen preview(Theme::accent());
+    preview.setWidth(2);
+    preview.setStyle(Qt::DashLine);
+    preview.setCapStyle(Qt::RoundCap);
+    g.setPen(preview);
+    g.drawLine(nodes[selectedNode].pos, end);
+}
 
-        QRadialGradient radial(n.pos, nodeRadius);
-        radial.setColorAt(0.0, QColor("#f0f2f6"));
-        radial.setColorAt(0.7, QColor("#e4e7ed"));
-        radial.setColorAt(1.0, QColor("#d8dbe2"));
-
-        g.setPen(QPen(QColor("#3a4250"), 2));
-        g.setBrush(radial);
-        g.drawEllipse(circle);
-
-        g.setPen(QColor("#12161c"));
-        g.drawText(circle, Qt::AlignCenter, n.name);
-    }
+void GraphWidget::drawNodes(QPainter &g) const {
+    for (int i = 0; i < nodes.size(); ++i) drawNode(g, i);
 }
 
 void GraphWidget::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton) {
-        emit nodeClicked(event->pos());
+        setFocus(Qt::MouseFocusReason);
+        cursorPos = event->pos();
+        const int hit = nodeAt(event->pos());
+        if (hit >= 0) {
+            draggedNode = hit;
+            dragDidMove = false;
+            dragPressPos = event->pos();
+            dragGrabOffset = nodes[hit].pos - event->pos();
+            hoverNode = hit;
+            setCursor(Qt::ClosedHandCursor);
+            update();
+        } else if (selectedNode >= 0) {
+            clearSelection();
+        } else {
+            emit canvasClicked(event->pos());
+        }
     }
     QFrame::mousePressEvent(event);
+}
+
+void GraphWidget::mouseMoveEvent(QMouseEvent *event) {
+    cursorPos = event->pos();
+
+    if (draggedNode >= 0 && draggedNode < nodes.size()) {
+        const int dist = (event->pos() - dragPressPos).manhattanLength();
+        if (dist > 6) {
+            const QPoint next = clampToCanvas(event->pos() + dragGrabOffset);
+            if (next != nodes[draggedNode].pos) {
+                if (!dragDidMove) {
+                    dragDidMove = true;
+                    emit nodeAboutToMove();
+                }
+                nodes[draggedNode].pos = next;
+            }
+        }
+        update();
+    } else {
+        hoverNode = nodeAt(event->pos());
+        if (selectedNode >= 0) {
+            setCursor(hoverNode >= 0 && hoverNode != selectedNode ? Qt::PointingHandCursor : Qt::CrossCursor);
+            update();
+        } else {
+            setCursor(hoverNode >= 0 ? Qt::OpenHandCursor : Qt::CrossCursor);
+        }
+    }
+    QFrame::mouseMoveEvent(event);
+}
+
+void GraphWidget::mouseReleaseEvent(QMouseEvent *event) {
+    if (draggedNode >= 0) {
+        const bool moved = dragDidMove;
+        const int hit = nodeAt(event->pos());
+        if (!dragDidMove && hit >= 0) {
+            if (selectedNode >= 0 && selectedNode != hit) {
+                emit nodesLinked(selectedNode, hit);
+                selectedNode = hit;
+            } else if (selectedNode == hit) {
+                selectedNode = -1;
+            } else {
+                selectedNode = hit;
+            }
+        }
+        draggedNode = -1;
+        dragDidMove = false;
+        hoverNode = nodeAt(event->pos());
+        setCursor(hoverNode >= 0 ? Qt::OpenHandCursor : Qt::CrossCursor);
+        if (moved) emit nodeMoved();
+        update();
+    }
+    QFrame::mouseReleaseEvent(event);
+}
+
+void GraphWidget::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_Escape) {
+        clearSelection();
+        return;
+    }
+    QFrame::keyPressEvent(event);
+}
+
+void GraphWidget::leaveEvent(QEvent *event) {
+    hoverNode = -1;
+    update();
+    QFrame::leaveEvent(event);
+}
+
+void GraphWidget::resizeEvent(QResizeEvent *event) {
+    QFrame::resizeEvent(event);
+    bool changed = false;
+    for (Node &n : nodes) {
+        const QPoint clamped = clampToCanvas(n.pos);
+        if (clamped != n.pos) {
+            n.pos = clamped;
+            changed = true;
+        }
+    }
+    if (changed) emit positionsChanged();
+    update();
 }

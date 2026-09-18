@@ -1,42 +1,17 @@
 {
-  // ============================================================
-  // 🧩 CMakePresets.json – Configuración central para CLion + Qt
-  // ============================================================
-  // Permite definir perfiles reutilizables para compilación
-  // sin tener que tocar las opciones manualmente en CLion.
-  // Compatible con CMake 3.19+ y Qt 6.x
-
   "version": 5,
-
-  // ------------------------------------------------------------
-  // 🔧 CONFIGURE PRESETS
-  // ------------------------------------------------------------
   "configurePresets": [
     {
-      // Nombre interno del preset (CLion lo muestra así)
       "name": "mingw-debug",
-
-      // Nombre descriptivo visible en la lista de presets
       "displayName": "MinGW + Ninja (Debug)",
-
-      // Generador que usa CLion (Ninja = rápido y estable)
       "generator": "Ninja",
-
-      // Carpeta donde se generarán los archivos de compilación
       "binaryDir": "${sourceDir}/cmake-build-debug",
-
-      // Variables que se aplican automáticamente al configurar
       "cacheVariables": {
-        // Tipo de build (Debug / Release)
         "CMAKE_BUILD_TYPE": "Debug",
-
-        // 🔹 Ruta de Qt (ajustada a tu instalación local)
         "CMAKE_PREFIX_PATH": "C:/Qt/6.9.3/mingw_64"
       }
     },
-
     {
-      // Variante optimizada para release (mismo entorno)
       "name": "mingw-release",
       "displayName": "MinGW + Ninja (Release)",
       "inherits": "mingw-debug",
@@ -46,24 +21,17 @@
       }
     }
   ],
-
-  // ------------------------------------------------------------
-  // 🧱 BUILD PRESETS
-  // ------------------------------------------------------------
   "buildPresets": [
     {
-      // Compilación normal en modo Debug
       "name": "build-debug",
       "configurePreset": "mingw-debug"
     },
     {
-      // Reconstrucción completa (borra antes de compilar)
       "name": "rebuild-debug",
       "configurePreset": "mingw-debug",
       "cleanFirst": true
     },
     {
-      // Compilación normal en modo Release
       "name": "build-release",
       "configurePreset": "mingw-release"
     }

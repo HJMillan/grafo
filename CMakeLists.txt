@@ -1,58 +1,82 @@
-# ============================================================
-# 🧩 CMakeLists.txt – Plantilla base estable para proyectos Qt
-# ============================================================
-
 cmake_minimum_required(VERSION 3.22)
 project(ShortestPathApp LANGUAGES CXX)
 
-# ------------------------------------------------------------
-# ⚙️ Configuración general del compilador
-# ------------------------------------------------------------
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
-
-# ------------------------------------------------------------
-# 📁 Rutas adicionales para los archivos .ui
-# ------------------------------------------------------------
 set(CMAKE_AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/ui")
 
-# ------------------------------------------------------------
-# 🔍 Buscar Qt6 (Widgets)
-# ------------------------------------------------------------
+if (DEFINED ENV{QT_DIR})
+    list(PREPEND CMAKE_PREFIX_PATH "$ENV{QT_DIR}")
+endif()
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
-# ------------------------------------------------------------
-# 🧠 Descubrir automáticamente todos los archivos del proyecto
-# ------------------------------------------------------------
-file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.ui"
+set(APP_SOURCES
+        src/main.cpp
+        src/MainWindow.cpp
+        src/MainWindow.h
+        src/GraphWidget.cpp
+        src/GraphWidget.h
+        src/GraphModel.cpp
+        src/GraphModel.h
+        src/ShortestPath.cpp
+        src/ShortestPath.h
+        src/Theme.cpp
+        src/Theme.h
+        src/GraphConstants.h
+        src/GraphFormat.h
+        ui/MainWindow.ui
 )
 
-# ------------------------------------------------------------
-# ⚙️ Crear el ejecutable con todos los archivos
-# ------------------------------------------------------------
 add_executable(${PROJECT_NAME} ${APP_SOURCES})
 
-# ------------------------------------------------------------
-# 📦 Incluir rutas de headers y UI
-# ------------------------------------------------------------
 target_include_directories(${PROJECT_NAME} PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
         "${CMAKE_CURRENT_SOURCE_DIR}/ui"
 )
 
-# ------------------------------------------------------------
-# 🔗 Vincular librerías de Qt
-# ------------------------------------------------------------
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets)
 
+function(grafo_warnings target)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE -Wall -Wextra)
+    endif()
+endfunction()
+
+grafo_warnings(${PROJECT_NAME})
+
+enable_testing()
+add_executable(ShortestPathTests
+        tests/test_shortest_path.cpp
+        tests/test_graph_model.cpp
+        tests/test_support.h
+        src/ShortestPath.cpp
+        src/GraphModel.cpp
+        src/GraphModel.h
+        src/ShortestPath.h
+        src/GraphConstants.h
+        src/GraphFormat.h
+)
+target_include_directories(ShortestPathTests PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests"
+)
+target_link_libraries(ShortestPathTests PRIVATE Qt6::Core)
+set_target_properties(ShortestPathTests PROPERTIES
+        AUTOMOC OFF
+        AUTOUIC OFF
+        AUTORCC OFF
+)
+grafo_warnings(ShortestPathTests)
+add_test(NAME ShortestPathTests COMMAND ShortestPathTests)
+set_tests_properties(ShortestPathTests PROPERTIES
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+)
+
 if (WIN32)
-    # Encuentra windeployqt en el bin de Qt (usamos CMAKE_PREFIX_PATH del preset)
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${CMAKE_PREFIX_PATH}/bin")
     if (WINDEPLOYQT_EXECUTABLE)
         add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
@@ -63,12 +87,3 @@ if (WIN32)
         message(WARNING "No se encontró windeployqt en ${CMAKE_PREFIX_PATH}/bin")
     endif()
 endif()
-
-
-# ------------------------------------------------------------
-# 🧩 Notas finales
-# ------------------------------------------------------------
-# ✔️ Detecta automáticamente nuevos .cpp/.h/.ui.
-# ✔️ Compatible con presets (mingw-debug / mingw-release).
-# ✔️ No requiere modificar rutas ni toolchains.
-# ✔️ Evita errores de AutoUic (ya incluye /ui en el path).

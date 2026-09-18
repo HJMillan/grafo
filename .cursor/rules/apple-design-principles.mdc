@@ -1,0 +1,40 @@
+---
+description: Apple HIG design principles used as decision criteria for UX/UI and behavior choices
+alwaysApply: true
+---
+
+# Apple Design Principles
+
+Source: https://developer.apple.com/design/human-interface-guidelines/design-principles
+(reintroduced June 8, 2026 — supersedes "Clarity / Deference / Depth" and the legacy six themes)
+
+Use these to weigh competing priorities and break ties. They are criteria, not rigid rules.
+
+- **Purpose** — Make something meaningful. At every stage, ask what the product is for and whether the design serves that purpose. Investigate existing solutions instead of recreating them.
+- **Agency** — Stay out of the way. Allow free exploration instead of locking people into flows or modes, and **always make mistakes recoverable**. Recovering from the unexpected must not cost people their time or work.
+- **Responsibility** — Be transparent about what the product does and why. Collect only what the product needs to function.
+- **Familiarity** — Build on concepts people already know. Once an appearance or behavior is established, apply it consistently everywhere. Give clear feedback: show when controls are available and when content changes.
+- **Flexibility** — Treat accessibility as a priority from the start, never as a final patch. Preserve context by keeping content and controls in consistent, predictable positions and adapting to window and screen size. Support multiple input methods.
+- **Simplicity** — Simplicity is **not** minimalism. Keep the important things close and let the others fall away. Be concise. Always establish an explicit hierarchy.
+- **Craft** — Be deliberate with every decision. Prototype early and discard what doesn't work. Shipping is not the finish line.
+- **Delight** — Decide which emotion the experience should evoke. Never mistake delight for decoration: it must not get in the way of the core task.
+
+## Non-negotiables
+
+Destructive actions must be reversible (undo) or explicitly confirmed, and must never share
+visual styling with routine actions.
+
+A dialog that warns "this change may cause inconsistencies, consider resetting" is an Agency
+violation: it hands a software problem to the user. Fix the underlying behavior instead.
+
+```
+// BAD — pushes the problem onto the user
+onModeToggled() {
+    showWarning("Existing edges are not updated. Consider clearing everything.");
+}
+
+// GOOD — the software absorbs the complexity
+onModeToggled() {
+    rebuildDerivedStateFromSourceOfTruth();
+}
+```

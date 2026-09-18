@@ -1,0 +1,40 @@
+---
+description: Apple Materials rules for translucent surfaces, layer separation and tinting
+globs: src/*Widget*,src/*Window*,ui/**/*.ui
+alwaysApply: false
+---
+
+# Materials & Layer Separation
+
+Source: https://developer.apple.com/design/human-interface-guidelines/materials
+
+Materials separate foreground (text, controls) from background (content) while letting color
+pass through, so people keep their context. Keep two layers distinct: a **functional layer**
+for controls and navigation that floats above a **content layer**.
+
+## Layering rules
+
+- Translucent "glass" treatment belongs to the functional layer **only**. In the content layer it makes controls compete with content and muddies hierarchy.
+- **Never stack glass on glass.** For elements sitting on a translucent surface, use fills, transparency and vibrancy so they read as a thin overlay rather than a second pane.
+- Never mix the `regular` and `clear` variants in the same context.
+- Default to `regular`: it blurs and adjusts background luminosity to protect legibility. Required when the background could hurt legibility, or when the component holds significant text.
+- Use `clear` only when **all three** hold: it sits over media-rich content, the content layer tolerates dimming, and the foreground content is bold and bright.
+- With `clear` over bright content, add a dark dimming layer at **35% opacity**. Skip it when the underlying content is already dark.
+- In resting states, avoid intersections between content and floating surfaces — reposition or scale the content to keep separation.
+
+## Choosing thickness
+
+- Thicker / more opaque → better contrast for text and fine-stroke elements.
+- Thinner / more translucent → preserves context by keeping the background visible.
+
+## Anti-patterns
+
+- **Choosing a material for the color it appears to give the UI.** Choose by semantic meaning and recommended usage; system settings can change appearance.
+- **Tinting everything.** Tint only primary elements and actions — if everything is tinted, nothing stands out. Brand color belongs in the content layer.
+- **Solid fills on a translucent surface.** They break the character of the material; use the tinting system so the element stays grounded in its environment.
+
+## Outside Apple platforms
+
+Reduce Transparency, Increase Contrast and Reduce Motion are automatic on Apple platforms but
+**not** in Qt, web or other toolkits. Implement the equivalents by hand: raise opacity and
+frost the surface, use stark colors with contrasting borders, and disable elastic motion.
