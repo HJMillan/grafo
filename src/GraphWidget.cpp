@@ -38,8 +38,7 @@ QVector<DrawEdge> buildDrawEdges(const Graph &g) {
 }
 
 GraphWidget::GraphWidget(QWidget *parent) : QFrame(parent) {
-    setStyleSheet("background-color: blue; border: 1px solid #1E4370;");
-    setFrameShape(QFrame::Box);
+    setFrameShape(QFrame::NoFrame);
     setAttribute(Qt::WA_OpaquePaintEvent);
 }
 

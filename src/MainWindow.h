@@ -3,9 +3,13 @@
 
 #include <QMainWindow>
 #include <QPoint>
+#include <optional>
 #include "Graph.h"
-#include "GraphWidget.h"
 #include "ShortestPath.h"
+
+class QAbstractButton;
+class QLabel;
+class QLineEdit;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -19,35 +23,44 @@ public:
     ~MainWindow();
 
 private slots:
-    void on_btnAddEdge_clicked();
-    void on_btnCalculate_clicked();
-    void on_btnAddNode_clicked();
-    void on_btnRemoveLast_clicked();
-    void on_btnClearAll_clicked();
-    void handleCanvasClick(const QPoint &p);
-    void on_chkDirected_toggled(bool checked);
+    void onAddNode();
+    void onRemoveLast();
+    void onClearAll();
+    void onCanvasClicked(const QPoint &p);
+    void onAddEdge();
+    void onCalculate();
+    void onDirectedToggled(bool checked);
 
 private:
     Ui::MainWindow *ui;
-    GraphWidget *graphView = nullptr;
     Graph graph;
-    bool uppercaseDefault = true;
+    bool resultShown = false; // hay un resultado en el banner que el grafo actual puede invalidar
 
-    void initGraphWidget();
+    void setupConnections();
+
+    // Nodos
     QString nextSuggestedName() const;
     QPoint suggestedPosition(int idx) const;
-    bool canAddNode(const QString &name, QString &reason) const;
-    bool addNodeInternal(const QString &name, const QPoint &pos, bool autoPlaced);
-    void removeLastNode();
-    void clearGraph();
+    QString nodeNameError(const QString &name) const;
+    bool addNode(const QPoint &pos, bool autoPlaced);
     void refreshNodeSelectors();
-    void graphChanged();
-    bool parseWeight(double &w) const;
-    void addEdge(int from, int to, double weight);
-    void clearHighlights();
 
-    void runSelectedAlgorithm();
-    void showResult(const PathResult &result);
+    // Aristas
+    struct WeightCheck {
+        std::optional<double> value;
+        QString error;
+    };
+    WeightCheck checkWeight() const;
+
+    // Estado de la interfaz
+    void graphChanged();
+    void updateControls();
+    static void setFieldError(QLineEdit *field, QLabel *label, const QString &error);
+    static void setButtonEnabled(QAbstractButton *button, bool enabled, const QString &reason = {});
+
+    // Resultado
+    QString selectedAlgorithmName() const;
+    void showResult(const PathResult &result, int src, int dest);
 };
 
 #endif // MAINWINDOW_H

@@ -1,34 +1,48 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
+#include "Messages.h"
 
-#include <QComboBox>
-#include <QMessageBox>
-#include <QFrame>
-#include <QLayout>
-#include <QtGlobal>
-#include <QGraphicsDropShadowEffect>
 #include <QAbstractButton>
+#include <QComboBox>
+#include <QGraphicsDropShadowEffect>
+#include <QLabel>
+#include <QLineEdit>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QCheckBox>
+#include <QSignalBlocker>
+#include <QStyle>
 #include <cmath>
 
 namespace {
-QString joinPath(const Graph &g, const QVector<int> &path) {
-    QString out;
-    for (int i = 0; i < path.size(); ++i) {
-        out += g.node(path[i]).name;
-        if (i + 1 < path.size()) out += " -> ";
-    }
-    return out;
+const char *kWindowStyle =
+        "QLineEdit[error=\"true\"] { border: 2px solid #d64545; border-radius: 3px; padding: 1px; }"
+        "QLabel#lblNodeError, QLabel#lblWeightError { color: #e04848; }"
+        "QLabel#lblAlgoWarning { background: rgba(209, 139, 0, 0.14);"
+        "  border-left: 4px solid #d18b00; border-radius: 3px; padding: 6px; }"
+        "QLabel#lblNodeHint { color: palette(placeholder-text); }";
+
+// Pide confirmación para una acción que borra datos. «Cancelar» es la opción por defecto.
+bool confirmDestructive(QWidget *parent, const Msg::Message &m, const QString &acceptText) {
+    QMessageBox box(QMessageBox::Warning, m.title, m.title, QMessageBox::NoButton, parent);
+    box.setInformativeText(m.text);
+    QPushButton *accept = box.addButton(acceptText, QMessageBox::DestructiveRole);
+    QPushButton *cancel = box.addButton(QStringLiteral("Cancelar"), QMessageBox::RejectRole);
+    box.setDefaultButton(cancel);
+    box.setEscapeButton(cancel);
+    box.exec();
+    return box.clickedButton() == accept;
 }
 }
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow) {
     ui->setupUi(this);
+    setStyleSheet(kWindowStyle);
     ui->txtNodeName->setMaxLength(1);
 
     // Sombra cian y efecto presionado para botones
     auto stylizeButton = [](QAbstractButton *btn) {
-        if (!btn) return;
         auto *shadow = new QGraphicsDropShadowEffect(btn);
         shadow->setBlurRadius(0);
         shadow->setOffset(2, 2);
@@ -38,6 +52,7 @@ MainWindow::MainWindow(QWidget *parent)
                 "QPushButton { color: white; }"
                 "QPushButton:hover { color: black; }"
                 "QPushButton:pressed { color: black; }"
+                "QPushButton:disabled { color: #7a7f87; }"
         );
         QObject::connect(btn, &QAbstractButton::pressed, btn, [shadow]() {
             shadow->setOffset(0, 0);
@@ -46,64 +61,53 @@ MainWindow::MainWindow(QWidget *parent)
             shadow->setOffset(2, 2);
         });
     };
+    for (QAbstractButton *b : QList<QAbstractButton *>{ui->btnCalculate, ui->btnAddNode, ui->btnRemoveLast,
+                                                       ui->btnClearAll, ui->btnAddEdge})
+        stylizeButton(b);
 
-    stylizeButton(ui->btnCalculate);
-    stylizeButton(ui->btnAddNode);
-    stylizeButton(ui->btnRemoveLast);
-    stylizeButton(ui->btnClearAll);
-    stylizeButton(ui->btnAddEdge);
-
-    initGraphWidget();
-
-    uppercaseDefault = ui->chkUppercase->isChecked();
     graph.setDirected(ui->chkDirected->isChecked());
-    graphView->setGraph(&graph);
-    ui->txtOutput->setText("Usa el panel derecho para configurar.\n\nDistancia total: (sin camino)");
+    ui->graphView->setGraph(&graph);
 
-    connect(graphView, &GraphWidget::canvasClicked, this, &MainWindow::handleCanvasClick);
+    const Msg::Message hint = Msg::initialHint();
+    ui->resultBanner->setMessage(ResultBanner::Info, hint.title, hint.text);
+
+    setupConnections();
+    updateControls();
 }
 
 MainWindow::~MainWindow() { delete ui; }
 
-// --------------------- Init ---------------------
-void MainWindow::initGraphWidget() {
-    graphView = qobject_cast<GraphWidget*>(ui->frameGraph);
-    if (!graphView) {
-        QFrame *placeholder = ui->frameGraph;
-        graphView = new GraphWidget(placeholder->parentWidget());
-        graphView->setObjectName("frameGraph");
+void MainWindow::setupConnections() {
+    connect(ui->btnAddNode, &QPushButton::clicked, this, &MainWindow::onAddNode);
+    connect(ui->btnRemoveLast, &QPushButton::clicked, this, &MainWindow::onRemoveLast);
+    connect(ui->btnClearAll, &QPushButton::clicked, this, &MainWindow::onClearAll);
+    connect(ui->btnAddEdge, &QPushButton::clicked, this, &MainWindow::onAddEdge);
+    connect(ui->btnCalculate, &QPushButton::clicked, this, &MainWindow::onCalculate);
+    connect(ui->chkDirected, &QCheckBox::toggled, this, &MainWindow::onDirectedToggled);
+    connect(ui->graphView, &GraphWidget::canvasClicked, this, &MainWindow::onCanvasClicked);
 
-        if (auto lay = placeholder->parentWidget()->layout()) {
-            lay->replaceWidget(placeholder, graphView);
-        } else {
-            graphView->setGeometry(placeholder->geometry());
-        }
-        placeholder->deleteLater();
-    }
+    // Validación mientras se escribe o cambia el contexto
+    connect(ui->txtNodeName, &QLineEdit::textChanged, this, &MainWindow::updateControls);
+    connect(ui->chkUppercase, &QCheckBox::toggled, this, &MainWindow::updateControls);
+    connect(ui->txtWeight, &QLineEdit::textChanged, this, &MainWindow::updateControls);
+    connect(ui->cbEdgeFrom, &QComboBox::currentIndexChanged, this, &MainWindow::updateControls);
+    connect(ui->cbEdgeTo, &QComboBox::currentIndexChanged, this, &MainWindow::updateControls);
+    for (QAbstractButton *rb : QList<QAbstractButton *>{ui->rbtnDijkstra, ui->rbtnBellman, ui->rbtnFloyd})
+        connect(rb, &QAbstractButton::toggled, this, &MainWindow::updateControls);
 }
 
-// --------------------- Helpers de nodos ---------------------
+// --------------------- Nodos ---------------------
 QString MainWindow::nextSuggestedName() const {
-    const QString alphabet = uppercaseDefault ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ" : "abcdefghijklmnopqrstuvwxyz";
-    for (int i = 0; i < alphabet.size(); ++i) {
-        QString candidate(alphabet[i]);
-        if (graph.indexOf(candidate) < 0) return candidate;
+    const QString alphabet = ui->chkUppercase->isChecked() ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                                           : "abcdefghijklmnopqrstuvwxyz";
+    for (const QChar c : alphabet) {
+        if (graph.indexOf(QString(c)) < 0) return QString(c);
     }
-    // Si se agotaron las letras básicas, volver a A/B/.../AA.
-    int idx = graph.nodeCount();
-    QString name;
-    int base = alphabet.size();
-    while (idx >= 0) {
-        int r = idx % base;
-        name.prepend(alphabet[r]);
-        idx = idx / base - 1;
-    }
-    return name;
+    return {};
 }
 
 QPoint MainWindow::suggestedPosition(int idx) const {
-    if (!graphView) return QPoint(50, 50);
-    const QRect r = graphView->rect();
+    const QRect r = ui->graphView->rect();
     const QPoint center = r.center();
     const int radius = qMax(80, qMin(r.width(), r.height()) / 2 - 40);
     const int denom = qMax(1, graph.nodeCount() + 1);
@@ -114,61 +118,46 @@ QPoint MainWindow::suggestedPosition(int idx) const {
     return QPoint(x, y);
 }
 
-bool MainWindow::canAddNode(const QString &name, QString &reason) const {
-    const QString trimmed = name.trimmed();
-    if (trimmed.isEmpty()) {
-        reason = "El nombre no puede estar vacío.";
-        return false;
+// Devuelve el error que impide agregar un nodo con el nombre escrito
+// (o con el automático, si el campo está vacío), o una cadena vacía.
+QString MainWindow::nodeNameError(const QString &typed) const {
+    if (graph.nodeCount() >= Graph::MaxNodes) return Msg::nodeLimit(Graph::MaxNodes);
+    if (typed.isEmpty()) {
+        return nextSuggestedName().isEmpty() ? Msg::nodeNoFreeName(ui->chkUppercase->isChecked())
+                                             : QString();
     }
-
-    if (trimmed.length() != 1 || !trimmed.at(0).isLetter()) {
-        reason = "El nombre del nodo debe ser una única letra (A-Z, a-z).";
-        return false;
+    if (typed.length() != 1 || !typed.at(0).isLetter()) return Msg::nodeNameInvalid();
+    if (graph.indexOf(typed) >= 0) {
+        const QChar c = typed.at(0);
+        const QString swapped(c.isUpper() ? c.toLower() : c.toUpper());
+        return Msg::nodeNameDuplicate(typed, graph.indexOf(swapped) < 0 ? swapped : QString());
     }
-
-    if (graph.nodeCount() >= Graph::MaxNodes) {
-        reason = "Límite de 26 nodos alcanzado.";
-        return false;
-    }
-    if (graph.indexOf(trimmed) >= 0) {
-        reason = "El nombre de nodo ya existe (sensible a mayúsculas).";
-        return false;
-    }
-    return true;
+    return {};
 }
 
-bool MainWindow::addNodeInternal(const QString &name, const QPoint &pos, bool autoPlaced) {
-    QString reason;
-    if (!canAddNode(name, reason)) {
-        QMessageBox::warning(this, "No se puede agregar el nodo", reason);
+bool MainWindow::addNode(const QPoint &pos, bool autoPlaced) {
+    const QString typed = ui->txtNodeName->text().trimmed();
+    if (!nodeNameError(typed).isEmpty()) {
+        updateControls(); // el error ya está visible bajo el campo
+        ui->txtNodeName->setFocus();
         return false;
     }
-
-    graph.addNode(name.trimmed(), pos, autoPlaced);
+    const QString name = typed.isEmpty() ? nextSuggestedName() : typed;
+    graph.addNode(name, pos, autoPlaced);
+    ui->txtNodeName->clear();
     refreshNodeSelectors();
     graphChanged();
     return true;
 }
 
-void MainWindow::removeLastNode() {
-    if (graph.nodeCount() == 0) return;
-    graph.removeNode(graph.nodeCount() - 1);
-    refreshNodeSelectors();
-    clearHighlights();
-}
-
-void MainWindow::clearGraph() {
-    graph.clear();
-    refreshNodeSelectors();
-    clearHighlights();
-    ui->txtOutput->clear();
-}
-
 void MainWindow::refreshNodeSelectors() {
     const auto fillCombo = [&](QComboBox *cb) {
+        const QString previous = cb->currentText();
+        QSignalBlocker block(cb);
         cb->clear();
         for (const auto &name : graph.names()) cb->addItem(name);
-        if (cb->count() > 0) cb->setCurrentIndex(cb->count() - 1);
+        const int keep = cb->findText(previous);
+        cb->setCurrentIndex(keep >= 0 ? keep : cb->count() - 1);
     };
     fillCombo(ui->cbEdgeFrom);
     fillCombo(ui->cbEdgeTo);
@@ -176,139 +165,162 @@ void MainWindow::refreshNodeSelectors() {
     fillCombo(ui->cbDestination);
 }
 
-void MainWindow::graphChanged() {
-    graphView->update();
+void MainWindow::onCanvasClicked(const QPoint &p) {
+    addNode(p, false);
 }
 
-bool MainWindow::parseWeight(double &w) const {
-    bool ok = false;
-    w = ui->txtWeight->text().trimmed().toDouble(&ok);
-    return ok;
+void MainWindow::onAddNode() {
+    addNode(suggestedPosition(graph.nodeCount()), true);
 }
 
-void MainWindow::addEdge(int from, int to, double weight) {
-    if (from < 0 || to < 0 || from >= graph.nodeCount() || to >= graph.nodeCount()) return;
+void MainWindow::onRemoveLast() {
+    if (graph.nodeCount() == 0) return;
+    graph.removeNode(graph.nodeCount() - 1);
+    refreshNodeSelectors();
+    graphChanged();
+}
 
-    if (ui->rbtnDijkstra->isChecked() && weight < 0) {
-        QMessageBox::warning(this, "Restricción de Dijkstra",
-                             "Dijkstra no permite pesos negativos. Modifique el peso o elija otro algoritmo.");
+void MainWindow::onClearAll() {
+    if (graph.nodeCount() == 0) return;
+    if (!confirmDestructive(this, Msg::confirmClearAll(graph.nodeCount(), graph.edgeList().size()),
+                            Msg::confirmClearAllAccept()))
         return;
-    }
-
-    graph.setEdge(from, to, weight);
-    clearHighlights();
+    graph.clear();
+    refreshNodeSelectors();
+    graphChanged();
+    const Msg::Message hint = Msg::initialHint();
+    ui->resultBanner->setMessage(ResultBanner::Info, hint.title, hint.text);
 }
 
-void MainWindow::clearHighlights() {
-    graphView->highlightPath({});
+// --------------------- Aristas ---------------------
+MainWindow::WeightCheck MainWindow::checkWeight() const {
+    const QString text = ui->txtWeight->text().trimmed();
+    if (text.isEmpty()) return {std::nullopt, Msg::weightEmpty()};
+
+    bool ok = false;
+    const double w = text.toDouble(&ok);
+    if (!ok) return {std::nullopt, Msg::weightNotNumber(text)};
+
+    if (w < 0 && ui->rbtnDijkstra->isChecked()) return {std::nullopt, Msg::weightNegativeDijkstra()};
+    return {w, {}};
 }
 
-// --------------------- Slots UI ---------------------
-void MainWindow::handleCanvasClick(const QPoint &p) {
-    QString name = ui->txtNodeName->text().trimmed();
-    uppercaseDefault = ui->chkUppercase->isChecked();
-    if (name.isEmpty()) name = nextSuggestedName();
-    if (addNodeInternal(name, p, false)) {
-        ui->txtNodeName->clear();
-    }
-}
-
-void MainWindow::on_btnAddNode_clicked() {
-    QString name = ui->txtNodeName->text().trimmed();
-    uppercaseDefault = ui->chkUppercase->isChecked();
-    if (name.isEmpty()) name = nextSuggestedName();
-
-    const QPoint pos = suggestedPosition(graph.nodeCount());
-    if (addNodeInternal(name, pos, true)) {
-        ui->txtNodeName->clear();
-    }
-}
-
-void MainWindow::on_btnRemoveLast_clicked() { removeLastNode(); }
-
-void MainWindow::on_btnClearAll_clicked() { clearGraph(); }
-
-void MainWindow::on_btnAddEdge_clicked() {
+void MainWindow::onAddEdge() {
     const int from = ui->cbEdgeFrom->currentIndex();
     const int to = ui->cbEdgeTo->currentIndex();
+    const WeightCheck w = checkWeight();
+    if (from < 0 || to < 0 || !w.value) return; // el botón ya estaba desactivado
 
-    double w = 0.0;
-    if (!parseWeight(w)) {
-        QMessageBox::warning(this, "Peso inválido", "Ingrese un peso numérico.");
-        return;
-    }
-
-    graph.setDirected(ui->chkDirected->isChecked());
-    addEdge(from, to, w);
+    graph.setEdge(from, to, *w.value);
+    graphChanged();
 }
 
-void MainWindow::on_btnCalculate_clicked() {
-    runSelectedAlgorithm();
-}
-
-void MainWindow::on_chkDirected_toggled(bool checked) {
+void MainWindow::onDirectedToggled(bool checked) {
     graph.setDirected(checked);
     graphChanged();
-
-    QMessageBox::information(this, "Cambio de Modo de Grafo",
-                             "El modo del grafo ha sido cambiado.\n\n"
-                             "Tome en cuenta que este cambio no modifica las aristas ya existentes. "
-                             "Si creó aristas en modo no-dirigido, estas seguirán siendo simétricas internamente. "
-                             "Para evitar inconsistencias, se recomienda limpiar el grafo y volver a añadir las aristas.");
+    ui->resultBanner->setMessage(ResultBanner::Warning, QStringLiteral("Modo del grafo cambiado"),
+                                 QStringLiteral("Las aristas existentes no se modificaron. Si las creó en el "
+                                                "otro modo, borre el grafo y vuelva a crearlas."));
 }
 
-// --------------------- Algoritmos ---------------------
-void MainWindow::runSelectedAlgorithm() {
-    ui->txtOutput->clear();
-    graph.setDirected(ui->chkDirected->isChecked());
+// --------------------- Estado de la interfaz ---------------------
+void MainWindow::graphChanged() {
+    ui->graphView->highlightPath({});
+    ui->graphView->update();
+    if (resultShown) {
+        const Msg::Message m = Msg::graphChanged();
+        ui->resultBanner->setMessage(ResultBanner::Info, m.title, m.text);
+        resultShown = false;
+    }
+    updateControls();
+}
+
+void MainWindow::updateControls() {
+    const bool hasNodes = graph.nodeCount() > 0;
+
+    // Nodos: solo se marca el campo si el usuario escribió algo; los errores
+    // que no dependen del texto (límite, sin letras libres) se muestran igual.
+    const QString typed = ui->txtNodeName->text().trimmed();
+    const QString nameError = nodeNameError(typed);
+    setFieldError(ui->txtNodeName, ui->lblNodeError, nameError);
+    setButtonEnabled(ui->btnAddNode, nameError.isEmpty(), nameError);
+    setButtonEnabled(ui->btnRemoveLast, hasNodes, QStringLiteral("No hay nodos que borrar."));
+    setButtonEnabled(ui->btnClearAll, hasNodes, QStringLiteral("No hay nodos que borrar."));
+
+    // Aristas
+    const WeightCheck w = checkWeight();
+    setFieldError(ui->txtWeight, ui->lblWeightError, hasNodes ? w.error : QString());
+    if (!hasNodes)
+        setButtonEnabled(ui->btnAddEdge, false, Msg::needsNodesForEdge());
+    else
+        setButtonEnabled(ui->btnAddEdge, w.value.has_value(), w.error);
+
+    // Cálculo
+    setButtonEnabled(ui->btnCalculate, hasNodes, Msg::needsNodesForCalculate());
+    ui->lblAlgoWarning->setVisible(!ui->lblAlgoWarning->text().isEmpty());
+}
+
+void MainWindow::setFieldError(QLineEdit *field, QLabel *label, const QString &error) {
+    const bool hasError = !error.isEmpty();
+    if (field->property("error").toBool() != hasError) {
+        field->setProperty("error", hasError);
+        field->style()->unpolish(field);
+        field->style()->polish(field);
+    }
+    label->setText(error);
+    label->setVisible(hasError);
+}
+
+void MainWindow::setButtonEnabled(QAbstractButton *button, bool enabled, const QString &reason) {
+    button->setEnabled(enabled);
+    button->setToolTip(enabled ? QString() : reason);
+    if (auto *effect = button->graphicsEffect()) effect->setEnabled(enabled);
+}
+
+// --------------------- Cálculo ---------------------
+QString MainWindow::selectedAlgorithmName() const {
+    if (ui->rbtnDijkstra->isChecked()) return ui->rbtnDijkstra->text();
+    if (ui->rbtnBellman->isChecked()) return ui->rbtnBellman->text();
+    return ui->rbtnFloyd->text();
+}
+
+void MainWindow::onCalculate() {
     const int src = ui->cbOrigin->currentIndex();
     const int dest = ui->cbDestination->currentIndex();
-
-    if (src < 0 || dest < 0 || src >= graph.nodeCount() || dest >= graph.nodeCount()) {
-        QMessageBox::warning(this, "Selección inválida", "Seleccione origen y destino.");
-        return;
-    }
+    if (src < 0 || dest < 0) return; // el botón ya estaba desactivado
 
     if (ui->rbtnDijkstra->isChecked()) {
-        if (!graph.negativeEdges().isEmpty()) {
-            QMessageBox::warning(this, "Restricción de Dijkstra",
-                                 "Dijkstra no permite pesos negativos. Modifique los caminos o elija otro algoritmo.");
+        const auto negatives = graph.negativeEdges();
+        if (!negatives.isEmpty()) {
+            ui->resultBanner->setMessage(ResultBanner::Error, QStringLiteral("No se puede usar Dijkstra"),
+                                         Msg::dijkstraWithNegatives(graph, negatives));
+            resultShown = true;
             return;
         }
-        showResult(dijkstra(graph, src, dest));
+        showResult(dijkstra(graph, src, dest), src, dest);
     } else if (ui->rbtnBellman->isChecked()) {
-        showResult(bellmanFord(graph, src, dest));
+        showResult(bellmanFord(graph, src, dest), src, dest);
     } else {
-        showResult(floydWarshall(graph, src, dest));
+        showResult(floydWarshall(graph, src, dest), src, dest);
     }
 }
 
-void MainWindow::showResult(const PathResult &result) {
+void MainWindow::showResult(const PathResult &result, int src, int dest) {
+    Msg::Message m;
     switch (result.status) {
     case PathResult::Ok:
-        ui->txtOutput->setText(
-                QString("Camino encontrado. Distancia = %1\nCamino: %2")
-                .arg(result.distance, 0, 'f', 2)
-                .arg(joinPath(graph, result.path)));
-        graphView->highlightPath(result.path);
+        m = Msg::pathFound(graph, result.path, result.distance, selectedAlgorithmName());
+        ui->resultBanner->setMessage(ResultBanner::Success, m.title, m.text);
         break;
     case PathResult::NoPath:
-        ui->txtOutput->setText("No existe camino entre los nodos seleccionados.");
-        graphView->highlightPath({});
+        m = Msg::noPath(graph, src, dest);
+        ui->resultBanner->setMessage(ResultBanner::Info, m.title, m.text);
         break;
     case PathResult::NegativeCycle:
-        if (!result.path.isEmpty()) {
-            ui->txtOutput->setText(QString("Ciclo negativo: %1, peso %2")
-                                   .arg(joinPath(graph, result.path))
-                                   .arg(result.distance, 0, 'f', 2));
-            QMessageBox::warning(this, "Ciclo negativo",
-                                 "Se detectó un ciclo de peso negativo. El camino mínimo no está definido.");
-        } else {
-            QMessageBox::warning(this, "Ciclo negativo",
-                                 "Se detectó un ciclo de peso negativo, pero no se pudo reconstruir. "
-                                 "El camino mínimo no está definido.");
-        }
-        graphView->highlightPath(result.path);
+        m = Msg::negativeCycle(graph, src, dest, result.path, result.distance);
+        ui->resultBanner->setMessage(ResultBanner::Error, m.title, m.text);
         break;
     }
+    ui->graphView->highlightPath(result.path);
+    resultShown = true;
 }
