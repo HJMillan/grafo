@@ -1,5 +1,5 @@
 # ============================================================
-# 🧩 CMakeLists.txt – Plantilla base estable para proyectos Qt
+# 🧩 CMakeLists.txt – ShortestPathApp (Qt 6)
 # ============================================================
 
 cmake_minimum_required(VERSION 3.22)
@@ -20,45 +20,46 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/ui")
 
 # ------------------------------------------------------------
-# 🔍 Buscar Qt6 (Widgets)
+# 🔍 Buscar Qt6
 # ------------------------------------------------------------
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
-
-# ------------------------------------------------------------
-# 🧠 Descubrir automáticamente todos los archivos del proyecto
-# ------------------------------------------------------------
-file(GLOB_RECURSE APP_SOURCES CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.ui"
-)
-
-# ------------------------------------------------------------
-# ⚙️ Crear el ejecutable con todos los archivos
-# ------------------------------------------------------------
-add_executable(${PROJECT_NAME} ${APP_SOURCES})
-
-# ------------------------------------------------------------
-# 📦 Incluir rutas de headers y UI
-# ------------------------------------------------------------
-target_include_directories(${PROJECT_NAME} PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ui"
-)
-
-# ------------------------------------------------------------
-# 🔗 Vincular librerías de Qt
-# ------------------------------------------------------------
-target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Test)
 
 # ------------------------------------------------------------
 # ⚠️ Advertencias del compilador
 # ------------------------------------------------------------
-if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
-elseif (MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE /W4)
-endif()
+function(enable_warnings target)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(${target} PRIVATE -Wall -Wextra)
+    elseif (MSVC)
+        target_compile_options(${target} PRIVATE /W4)
+    endif()
+endfunction()
+
+# ------------------------------------------------------------
+# 🧠 Núcleo: modelo del grafo y algoritmos (solo QtCore)
+# ------------------------------------------------------------
+add_library(graphcore STATIC
+        src/Graph.cpp src/Graph.h
+        src/ShortestPath.cpp src/ShortestPath.h
+)
+target_include_directories(graphcore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(graphcore PUBLIC Qt6::Core)
+enable_warnings(graphcore)
+
+# ------------------------------------------------------------
+# 🖥️ Aplicación
+# ------------------------------------------------------------
+file(GLOB APP_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/*.ui"
+)
+list(FILTER APP_SOURCES EXCLUDE REGEX "/src/(Graph|ShortestPath)\\.(cpp|h)$")
+
+add_executable(${PROJECT_NAME} ${APP_SOURCES})
+target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ui")
+target_link_libraries(${PROJECT_NAME} PRIVATE graphcore Qt6::Widgets)
+enable_warnings(${PROJECT_NAME})
 
 if (WIN32)
     # Busca windeployqt junto a qmake de la instalación de Qt encontrada
@@ -75,11 +76,12 @@ if (WIN32)
     endif()
 endif()
 
+# ------------------------------------------------------------
+# 🧪 Tests (ctest)
+# ------------------------------------------------------------
+enable_testing()
 
-# ------------------------------------------------------------
-# 🧩 Notas finales
-# ------------------------------------------------------------
-# ✔️ Detecta automáticamente nuevos .cpp/.h/.ui.
-# ✔️ Compatible con presets (mingw-debug / mingw-release).
-# ✔️ No requiere modificar rutas ni toolchains.
-# ✔️ Evita errores de AutoUic (ya incluye /ui en el path).
+add_executable(tst_shortestpath tests/tst_shortestpath.cpp)
+target_link_libraries(tst_shortestpath PRIVATE graphcore Qt6::Test)
+enable_warnings(tst_shortestpath)
+add_test(NAME tst_shortestpath COMMAND tst_shortestpath)

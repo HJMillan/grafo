@@ -1,4 +1,6 @@
 #include "GraphWidget.h"
+#include "Graph.h"
+#include <QPainter>
 #include <QPen>
 #include <QFont>
 #include <QFontMetrics>
@@ -6,77 +8,50 @@
 #include <QtMath>
 #include <QtGlobal>
 
+namespace {
+// Arista tal como se dibuja: en modo dirigido, ida y vuelta se combinan
+// en una sola línea con ambos pesos.
+struct DrawEdge {
+    int from;
+    int to;
+    double weight;
+    bool directed;
+    bool hasReverse;
+    double reverseWeight;
+};
+
+QVector<DrawEdge> buildDrawEdges(const Graph &g) {
+    QVector<DrawEdge> out;
+    if (!g.isDirected()) {
+        for (const auto &e : g.edgeList())
+            out.append({e.from, e.to, e.weight, false, false, 0.0});
+        return out;
+    }
+    for (const auto &e : g.arcs()) {
+        const auto rev = g.edge(e.to, e.from);
+        if (e.from != e.to && rev && e.to < e.from) continue; // ya combinada
+        const bool hasRev = e.from != e.to && rev.has_value();
+        out.append({e.from, e.to, e.weight, true, hasRev, hasRev ? *rev : 0.0});
+    }
+    return out;
+}
+}
+
 GraphWidget::GraphWidget(QWidget *parent) : QFrame(parent) {
     setStyleSheet("background-color: blue; border: 1px solid #1E4370;");
     setFrameShape(QFrame::Box);
     setAttribute(Qt::WA_OpaquePaintEvent);
 }
 
-void GraphWidget::addNodeVisual(const QString &name, const QPoint &pos) {
-    nodes.append({name, pos});
-    update();
-}
-
-void GraphWidget::removeLastNode() {
-    if (!nodes.isEmpty()) nodes.removeLast();
-    edges.clear();
-    highlightedPairs.clear();
-    update();
-}
-
-void GraphWidget::clearAll() {
-    nodes.clear();
-    edges.clear();
-    highlightedPairs.clear();
-    update();
-}
-
-void GraphWidget::setAdjacency(const QVector<QVector<double>> &adj, int nodeCount, double inf, bool directed) {
-    edges.clear();
-    directedEdges = directed;
-    if (nodeCount <= 0) { update(); return; }
-
-    QVector<QVector<bool>> used(nodeCount, QVector<bool>(nodeCount, false));
-
-    // reconstruir aristas; si es dirigido y existe ida/vuelta, combinamos en una sola con ambos pesos
-    for (int i = 0; i < nodeCount; ++i) {
-        for (int j = 0; j < nodeCount; ++j) {
-            if (adj[i][j] >= inf / 2) continue;
-            if (used[i][j]) continue;
-            if (!directed) {
-                if (j <= i) continue; // evitar duplicar en no dirigido
-                edges.append({i, j, adj[i][j], false, false, 0.0});
-            } else {
-                if (i == j) {
-                    edges.append({i, j, adj[i][j], true, false, 0.0});
-                    used[i][j] = true;
-                    continue;
-                }
-                bool hasRev = (j < nodeCount && adj[j][i] < inf / 2);
-                double revW = hasRev ? adj[j][i] : 0.0;
-                edges.append({i, j, adj[i][j], true, hasRev, revW});
-                used[i][j] = true;
-                if (hasRev) used[j][i] = true;
-            }
-        }
-    }
+void GraphWidget::setGraph(const Graph *graph) {
+    m_graph = graph;
     update();
 }
 
 void GraphWidget::highlightPath(const QVector<int> &path) {
-    highlightedPairs.clear();
-    if (path.size() < 2) { update(); return; }
-    for (int i = 0; i + 1 < path.size(); ++i) {
-        highlightedPairs.append({path[i], path[i+1]});
-    }
+    m_highlighted.clear();
+    for (int i = 0; i + 1 < path.size(); ++i) m_highlighted.append({path[i], path[i + 1]});
     update();
-}
-
-void GraphWidget::highlightPath(const QVector<int> &path, const QVector<QVector<double>> &adj, double inf, bool directed) {
-    Q_UNUSED(adj);
-    Q_UNUSED(inf);
-    directedEdges = directed;
-    highlightPath(path);
 }
 
 void GraphWidget::paintEvent(QPaintEvent *event) {
@@ -97,15 +72,17 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
     wFont.setPointSizeF(12.0);
     QFontMetrics wfm(wFont);
 
-    // Aristas
-    for (const Edge &e : edges) {
-        if (e.from >= nodes.size() || e.to >= nodes.size()) continue;
-        const Node &a = nodes[e.from];
-        const Node &b = nodes[e.to];
+    if (!m_graph) return;
+    const auto &nodes = m_graph->nodes();
 
-        const bool hi = highlightedPairs.contains({e.from, e.to}) ||
-                        (!e.directed && highlightedPairs.contains({e.to, e.from})) ||
-                        (e.hasReverse && highlightedPairs.contains({e.to, e.from}));
+    // Aristas
+    for (const DrawEdge &e : buildDrawEdges(*m_graph)) {
+        const QPointF ap = nodes[e.from].pos;
+        const QPointF bp = nodes[e.to].pos;
+
+        const bool hi = m_highlighted.contains({e.from, e.to}) ||
+                        (!e.directed && m_highlighted.contains({e.to, e.from})) ||
+                        (e.hasReverse && m_highlighted.contains({e.to, e.from}));
 
         const bool selfLoop = (e.from == e.to);
 
@@ -118,11 +95,11 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
             glow.setJoinStyle(Qt::RoundJoin);
             g.setPen(glow);
             if (selfLoop) {
-                QRect loopRect(a.pos.x() - nodeRadius - 12, a.pos.y() - nodeRadius - 22,
-                               (nodeRadius + 12) * 2, (nodeRadius + 12) * 2);
+                QRectF loopRect(ap.x() - nodeRadius - 12, ap.y() - nodeRadius - 22,
+                                (nodeRadius + 12) * 2, (nodeRadius + 12) * 2);
                 g.drawArc(loopRect, 45 * 16, 270 * 16);
             } else {
-                g.drawLine(a.pos, b.pos);
+                g.drawLine(ap, bp);
             }
         }
 
@@ -131,11 +108,11 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
         g.setPen(pen);
         g.setBrush(Qt::NoBrush);
         if (selfLoop) {
-            QRect loopRect(a.pos.x() - nodeRadius - 12, a.pos.y() - nodeRadius - 22,
-                           (nodeRadius + 12) * 2, (nodeRadius + 12) * 2);
+            QRectF loopRect(ap.x() - nodeRadius - 12, ap.y() - nodeRadius - 22,
+                            (nodeRadius + 12) * 2, (nodeRadius + 12) * 2);
             g.drawArc(loopRect, 45 * 16, 270 * 16);
         } else {
-            g.drawLine(a.pos, b.pos);
+            g.drawLine(ap, bp);
         }
 
         auto drawArrow = [&](const QPointF &fromP, const QPointF &toP) {
@@ -161,11 +138,11 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
         };
 
         if (e.directed && !selfLoop) {
-            drawArrow(a.pos, b.pos);
-            if (e.hasReverse) drawArrow(b.pos, a.pos);
+            drawArrow(ap, bp);
+            if (e.hasReverse) drawArrow(bp, ap);
         }
 
-        QLineF line(a.pos, b.pos);
+        QLineF line(ap, bp);
         const qreal len = line.length();
         const QPointF mid = line.pointAt(0.5);
         QPointF n(0,0.5);
@@ -191,7 +168,7 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
 
         QRect pill(0, 0, ts.width() + pad*2, ts.height() + pad);
         if (selfLoop) {
-            pill.moveCenter(QPoint(a.pos.x(), a.pos.y() - nodeRadius - 28));
+            pill.moveCenter(QPointF(ap.x(), ap.y() - nodeRadius - 28).toPoint());
         } else {
             pill.moveCenter((mid + n * 16.0).toPoint());
         }
@@ -224,7 +201,7 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
     nFont.setPointSizeF(11.0);
     g.setFont(nFont);
 
-    for (const Node &n : nodes) {
+    for (const Graph::Node &n : nodes) {
         QRectF circle(n.pos.x() - nodeRadius, n.pos.y() - nodeRadius,
                       nodeRadius * 2, nodeRadius * 2);
 
@@ -244,7 +221,7 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
 
 void GraphWidget::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton) {
-        emit nodeClicked(event->pos());
+        emit canvasClicked(event->pos());
     }
     QFrame::mousePressEvent(event);
 }

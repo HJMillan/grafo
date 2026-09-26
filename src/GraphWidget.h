@@ -2,49 +2,34 @@
 #define GRAPHWIDGET_H
 
 #include <QFrame>
-#include <QPainter>
 #include <QMouseEvent>
+#include <QPair>
 #include <QVector>
 
+class Graph;
+
+// Lienzo que dibuja un Graph. No guarda copia de nodos ni aristas:
+// siempre pinta el estado actual del modelo.
 class GraphWidget : public QFrame {
     Q_OBJECT
 public:
     explicit GraphWidget(QWidget *parent = nullptr);
 
-    struct Node {
-        QString name;
-        QPoint pos;
-    };
-    struct Edge {
-        int from;
-        int to;
-        double weight;
-        bool directed;
-        bool hasReverse;
-        double reverseWeight;
-    };
-
     static constexpr int nodeRadius = 22;
 
-    void addNodeVisual(const QString &name, const QPoint &pos);
-    void removeLastNode();
-    void clearAll();
-    void setAdjacency(const QVector<QVector<double>> &adj, int nodeCount, double inf, bool directed);
-    void highlightPath(const QVector<int> &path, const QVector<QVector<double>> &adj, double inf, bool directed);
-    void highlightPath(const QVector<int> &path); // limpia resaltado si path vacío
+    void setGraph(const Graph *graph);
+    void highlightPath(const QVector<int> &path); // limpia el resaltado si path está vacío
 
 signals:
-    void nodeClicked(const QPoint &pos);
+    void canvasClicked(const QPoint &pos);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
 
 private:
-    QVector<Node> nodes;
-    QVector<Edge> edges;
-    QVector<QPair<int,int>> highlightedPairs;
-    bool directedEdges = false;
+    const Graph *m_graph = nullptr;
+    QVector<QPair<int, int>> m_highlighted;
 };
 
 #endif // GRAPHWIDGET_H
