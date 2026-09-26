@@ -1,25 +1,49 @@
 #include "ResultBanner.h"
+#include "Theme.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QStyle>
+#include <QPainter>
 #include <QVBoxLayout>
 
 namespace {
-struct KindStyle {
-    const char *accent;
-    const char *background;
-    QStyle::StandardPixmap icon;
-};
-
-KindStyle styleFor(ResultBanner::Kind kind) {
+QColor colorFor(ResultBanner::Kind kind) {
     switch (kind) {
-    case ResultBanner::Success: return {"#2e9e5b", "rgba(46, 158, 91, 0.14)", QStyle::SP_DialogApplyButton};
-    case ResultBanner::Warning: return {"#d18b00", "rgba(209, 139, 0, 0.14)", QStyle::SP_MessageBoxWarning};
-    case ResultBanner::Error:   return {"#d64545", "rgba(214, 69, 69, 0.14)", QStyle::SP_MessageBoxCritical};
+    case ResultBanner::Success: return Theme::success();
+    case ResultBanner::Warning: return Theme::warning();
+    case ResultBanner::Error:   return Theme::destructive();
     case ResultBanner::Info:
-    default:                    return {"#3a7bd5", "rgba(58, 123, 213, 0.12)", QStyle::SP_MessageBoxInformation};
+    default:                    return Theme::accent();
     }
+}
+
+QString glyphFor(ResultBanner::Kind kind) {
+    switch (kind) {
+    case ResultBanner::Success: return QStringLiteral("✓");
+    case ResultBanner::Warning: return QStringLiteral("!");
+    case ResultBanner::Error:   return QStringLiteral("×");
+    case ResultBanner::Info:
+    default:                    return QStringLiteral("i");
+    }
+}
+
+// Círculo del color del tipo con su símbolo en blanco.
+QPixmap iconFor(ResultBanner::Kind kind, qreal dpr) {
+    const int size = 22;
+    QPixmap pm(QSize(size, size) * dpr);
+    pm.setDevicePixelRatio(dpr);
+    pm.fill(Qt::transparent);
+    QPainter p(&pm);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setPen(Qt::NoPen);
+    p.setBrush(colorFor(kind));
+    p.drawEllipse(QRectF(0, 0, size, size));
+    QFont f = Theme::headline();
+    f.setPointSizeF(kind == ResultBanner::Error ? 14 : 11);
+    p.setFont(f);
+    p.setPen(Qt::white);
+    p.drawText(QRectF(0, 0, size, size), Qt::AlignCenter, glyphFor(kind));
+    return pm;
 }
 }
 
@@ -28,14 +52,10 @@ ResultBanner::ResultBanner(QWidget *parent) : QFrame(parent) {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
 
     m_icon = new QLabel(this);
-    m_icon->setFixedSize(24, 24);
-    m_icon->setAlignment(Qt::AlignTop);
+    m_icon->setFixedSize(22, 22);
 
     m_title = new QLabel(this);
     m_title->setWordWrap(true);
-    QFont f = m_title->font();
-    f.setBold(true);
-    m_title->setFont(f);
 
     m_text = new QLabel(this);
     m_text->setWordWrap(true);
@@ -47,8 +67,9 @@ ResultBanner::ResultBanner(QWidget *parent) : QFrame(parent) {
     texts->addWidget(m_text);
 
     auto *row = new QHBoxLayout(this);
-    row->setContentsMargins(12, 8, 12, 8);
-    row->setSpacing(10);
+    row->setContentsMargins(Theme::SpacingBezeled + 2, Theme::SpacingBezeled,
+                            Theme::SpacingBezeled + 2, Theme::SpacingBezeled);
+    row->setSpacing(Theme::SpacingBezeled);
     row->addWidget(m_icon, 0, Qt::AlignTop);
     row->addLayout(texts, 1);
 
@@ -57,14 +78,23 @@ ResultBanner::ResultBanner(QWidget *parent) : QFrame(parent) {
 
 void ResultBanner::setMessage(Kind kind, const QString &title, const QString &text) {
     m_kind = kind;
-    const KindStyle s = styleFor(kind);
-    setStyleSheet(QString("#resultBanner { background: %1; border: 1px solid %2;"
-                          " border-left: 5px solid %2; border-radius: 4px; }")
-                          .arg(s.background, s.accent));
-    m_icon->setPixmap(style()->standardIcon(s.icon).pixmap(20, 20));
     m_title->setText(title);
     m_text->setText(text);
     m_text->setVisible(!text.isEmpty());
+    refreshStyle();
+}
+
+void ResultBanner::refreshStyle() {
+    // Fondo: el color del tipo muy atenuado, para que se lea como estado y no como botón.
+    QColor wash = colorFor(m_kind);
+    wash.setAlpha(Theme::isDark() ? 40 : 28);
+    setStyleSheet(QString("#resultBanner { background-color: rgba(%1, %2, %3, %4);"
+                          " border: none; border-radius: 12px; }"
+                          "#resultBanner QLabel { background: transparent; }")
+                          .arg(wash.red()).arg(wash.green()).arg(wash.blue()).arg(wash.alpha()));
+    m_title->setFont(Theme::headline());
+    m_text->setFont(Theme::body());
+    m_icon->setPixmap(iconFor(m_kind, devicePixelRatioF()));
 }
 
 QString ResultBanner::title() const { return m_title->text(); }

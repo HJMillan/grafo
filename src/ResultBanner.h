@@ -19,6 +19,9 @@ public:
     QString title() const;
     QString text() const;
 
+    // Vuelve a aplicar colores y tipografía (p. ej. al cambiar claro/oscuro).
+    void refreshStyle();
+
 private:
     Kind m_kind = Info;
     QLabel *m_icon;

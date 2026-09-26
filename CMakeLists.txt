@@ -56,6 +56,7 @@ add_library(appui STATIC
         src/GraphWidget.cpp src/GraphWidget.h
         src/ResultBanner.cpp src/ResultBanner.h
         src/Messages.cpp src/Messages.h
+        src/Theme.cpp src/Theme.h
         ui/MainWindow.ui
 )
 target_include_directories(appui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")

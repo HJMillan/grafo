@@ -6,41 +6,55 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1100</width>
+    <width>1180</width>
     <height>780</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
-    <width>800</width>
-    <height>560</height>
+    <width>900</width>
+    <height>600</height>
    </size>
   </property>
   <property name="windowTitle">
    <string>Caminos más cortos</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QHBoxLayout" name="layoutMain" stretch="1,0">
+   <layout class="QHBoxLayout" name="layoutRoot" stretch="1,0">
     <property name="spacing">
-     <number>10</number>
+     <number>24</number>
     </property>
     <property name="leftMargin">
-     <number>10</number>
+     <number>24</number>
     </property>
     <property name="topMargin">
-     <number>10</number>
+     <number>20</number>
     </property>
     <property name="rightMargin">
-     <number>10</number>
+     <number>24</number>
     </property>
     <property name="bottomMargin">
-     <number>10</number>
+     <number>24</number>
     </property>
     <item>
-     <layout class="QVBoxLayout" name="layoutCanvas" stretch="1,0">
+     <layout class="QVBoxLayout" name="layoutContent" stretch="0,0,1,0,0">
       <property name="spacing">
        <number>8</number>
       </property>
+      <item>
+       <widget class="QLabel" name="lblTitle">
+        <property name="text">
+         <string>Caminos más cortos</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lblSubtitle">
+        <property name="text">
+         <string>Clic en el lienzo: crear nodo · Arrastrar: mover · Clic derecho: eliminar</string>
+        </property>
+       </widget>
+      </item>
       <item>
        <widget class="GraphWidget" name="graphView">
         <property name="sizePolicy">
@@ -58,326 +72,384 @@
        </widget>
       </item>
       <item>
+       <widget class="QLabel" name="lblResultCaption">
+        <property name="text">
+         <string>Resultado</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="ResultBanner" name="resultBanner"/>
       </item>
      </layout>
     </item>
     <item>
-     <widget class="QScrollArea" name="scrollSide">
+     <widget class="QFrame" name="panelSidebar">
       <property name="minimumSize">
        <size>
-        <width>300</width>
+        <width>320</width>
         <height>0</height>
        </size>
       </property>
       <property name="maximumSize">
        <size>
-        <width>300</width>
+        <width>320</width>
         <height>16777215</height>
        </size>
       </property>
-      <property name="frameShape">
-       <enum>QFrame::NoFrame</enum>
-      </property>
-      <property name="horizontalScrollBarPolicy">
-       <enum>Qt::ScrollBarAlwaysOff</enum>
-      </property>
-      <property name="widgetResizable">
-       <bool>true</bool>
-      </property>
-      <widget class="QWidget" name="panelSide">
-      <layout class="QVBoxLayout" name="layoutSide">
+      <layout class="QVBoxLayout" name="layoutSidebar">
        <property name="spacing">
-        <number>10</number>
+        <number>8</number>
        </property>
        <property name="leftMargin">
-        <number>0</number>
+        <number>12</number>
        </property>
        <property name="topMargin">
-        <number>0</number>
+        <number>12</number>
        </property>
        <property name="rightMargin">
-        <number>6</number>
+        <number>12</number>
        </property>
        <property name="bottomMargin">
-        <number>0</number>
+        <number>12</number>
        </property>
        <item>
-        <widget class="QGroupBox" name="grpGrafo">
-         <property name="title">
-          <string>Grafo</string>
+        <widget class="QScrollArea" name="scrollSide">
+         <property name="frameShape">
+          <enum>QFrame::NoFrame</enum>
          </property>
-         <layout class="QVBoxLayout" name="layoutGrafo">
-          <item>
-           <widget class="QCheckBox" name="chkDirected">
-            <property name="text">
-             <string>Grafo dirigido</string>
-            </property>
-            <property name="toolTip">
-             <string>En un grafo dirigido cada arista va en un solo sentido y admite pesos negativos.</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
+         <property name="horizontalScrollBarPolicy">
+          <enum>Qt::ScrollBarAlwaysOff</enum>
+         </property>
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <widget class="QWidget" name="panelSide">
+          <layout class="QVBoxLayout" name="layoutSide">
+           <property name="spacing">
+            <number>8</number>
+           </property>
+           <property name="leftMargin">
+            <number>4</number>
+           </property>
+           <property name="topMargin">
+            <number>4</number>
+           </property>
+           <property name="rightMargin">
+            <number>10</number>
+           </property>
+           <property name="bottomMargin">
+            <number>4</number>
+           </property>
+           <item>
+            <layout class="QHBoxLayout" name="layoutBuildHeader">
+             <item>
+              <widget class="QLabel" name="lblSectionBuild">
+               <property name="text">
+                <string>Construir</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="spacerBuildHeader">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>0</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="chkDirected">
+               <property name="text">
+                <string>Dirigido</string>
+               </property>
+               <property name="toolTip">
+                <string>En un grafo dirigido cada arista va en un solo sentido y admite pesos negativos.</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="layoutNodeName">
+             <item>
+              <widget class="QLineEdit" name="txtNodeName">
+               <property name="placeholderText">
+                <string>Nombre · A, B, C…</string>
+               </property>
+               <property name="toolTip">
+                <string>Una letra de la A a la Z (distingue mayúsculas: A ≠ a). Si lo deja vacío se usa la siguiente letra libre.</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="chkUppercase">
+               <property name="text">
+                <string>A–Z</string>
+               </property>
+               <property name="toolTip">
+                <string>Mayúsculas para el nombre automático (solo cuando el campo está vacío).</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblNodeError">
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="layoutNodeActions">
+             <item>
+              <widget class="QPushButton" name="btnAddNode">
+               <property name="text">
+                <string>Agregar nodo</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnRemoveLast">
+               <property name="text">
+                <string>Quitar último</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QFrame" name="sepBuild"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblSectionEdge">
+             <property name="text">
+              <string>Arista</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QGridLayout" name="layoutEdge">
+             <property name="horizontalSpacing">
+              <number>8</number>
+             </property>
+             <property name="verticalSpacing">
+              <number>4</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QLabel" name="lblEdgeFrom">
+               <property name="text">
+                <string>Desde</string>
+               </property>
+               <property name="buddy">
+                <cstring>cbEdgeFrom</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLabel" name="lblEdgeTo">
+               <property name="text">
+                <string>Hacia</string>
+               </property>
+               <property name="buddy">
+                <cstring>cbEdgeTo</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QLabel" name="lblWeight">
+               <property name="text">
+                <string>Peso</string>
+               </property>
+               <property name="buddy">
+                <cstring>txtWeight</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QComboBox" name="cbEdgeFrom"/>
+             </item>
+             <item row="1" column="1">
+              <widget class="QComboBox" name="cbEdgeTo"/>
+             </item>
+             <item row="1" column="2">
+              <widget class="QLineEdit" name="txtWeight">
+               <property name="text">
+                <string>1</string>
+               </property>
+               <property name="toolTip">
+                <string>Número con coma o punto decimal, por ejemplo 2,5 o -3.</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblWeightError">
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="layoutEdgeActions">
+             <item>
+              <widget class="QPushButton" name="btnAddEdge">
+               <property name="text">
+                <string>Agregar arista</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnRemoveEdge">
+               <property name="text">
+                <string>Quitar arista</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QFrame" name="sepEdge"/>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblSectionCalc">
+             <property name="text">
+              <string>Calcular camino</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QGridLayout" name="layoutAlgo">
+             <property name="verticalSpacing">
+              <number>0</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QRadioButton" name="rbtnDijkstra">
+               <property name="text">
+                <string>Dijkstra</string>
+               </property>
+               <property name="toolTip">
+                <string>Rápido, pero no admite pesos negativos.</string>
+               </property>
+               <property name="checked">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QRadioButton" name="rbtnBellman">
+               <property name="text">
+                <string>Bellman-Ford</string>
+               </property>
+               <property name="toolTip">
+                <string>Admite pesos negativos y detecta ciclos negativos.</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0" colspan="2">
+              <widget class="QRadioButton" name="rbtnFloyd">
+               <property name="text">
+                <string>Floyd-Warshall</string>
+               </property>
+               <property name="toolTip">
+                <string>Admite pesos negativos y detecta ciclos negativos.</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lblAlgoWarning">
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QGridLayout" name="layoutQuery">
+             <property name="horizontalSpacing">
+              <number>8</number>
+             </property>
+             <property name="verticalSpacing">
+              <number>4</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QLabel" name="lblOrigin">
+               <property name="text">
+                <string>Origen</string>
+               </property>
+               <property name="buddy">
+                <cstring>cbOrigin</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLabel" name="lblDestination">
+               <property name="text">
+                <string>Destino</string>
+               </property>
+               <property name="buddy">
+                <cstring>cbDestination</cstring>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QComboBox" name="cbOrigin"/>
+             </item>
+             <item row="1" column="1">
+              <widget class="QComboBox" name="cbDestination"/>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnCalculate">
+             <property name="text">
+              <string>Calcular</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacerSide">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>0</width>
+               <height>0</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
         </widget>
        </item>
        <item>
-        <widget class="QGroupBox" name="grpNodos">
-         <property name="title">
-          <string>Nodos</string>
-         </property>
-         <layout class="QGridLayout" name="layoutNodos">
-          <item row="0" column="0" colspan="2">
-           <widget class="QLabel" name="lblNodeName">
-            <property name="text">
-             <string>Nombre (distingue mayúsculas: A ≠ a)</string>
-            </property>
-            <property name="buddy">
-             <cstring>txtNodeName</cstring>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLineEdit" name="txtNodeName">
-            <property name="placeholderText">
-             <string>Automático</string>
-            </property>
-            <property name="toolTip">
-             <string>Una letra de la A a la Z. Si lo deja vacío se usa la siguiente letra libre.</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QCheckBox" name="chkUppercase">
-            <property name="text">
-             <string>Mayúsculas</string>
-            </property>
-            <property name="toolTip">
-             <string>Solo afecta al nombre automático, cuando el campo está vacío.</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0" colspan="2">
-           <widget class="QLabel" name="lblNodeError">
-            <property name="wordWrap">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0">
-           <widget class="QPushButton" name="btnAddNode">
-            <property name="text">
-             <string>Agregar nodo</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="1">
-           <widget class="QPushButton" name="btnRemoveLast">
-            <property name="text">
-             <string>Borrar último</string>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="0" colspan="2">
-           <widget class="QPushButton" name="btnClearAll">
-            <property name="text">
-             <string>Borrar todo</string>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="0" colspan="2">
-           <widget class="QLabel" name="lblNodeHint">
-            <property name="text">
-             <string>En el lienzo: clic para colocar un nodo, arrastrar para moverlo, clic derecho para eliminarlo.</string>
-            </property>
-            <property name="wordWrap">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
+        <widget class="QFrame" name="sepFooter"/>
        </item>
        <item>
-        <widget class="QGroupBox" name="grpAristas">
-         <property name="title">
-          <string>Aristas</string>
-         </property>
-         <layout class="QGridLayout" name="layoutAristas" columnstretch="0,1">
-          <item row="0" column="0">
-           <widget class="QLabel" name="lblEdgeFrom">
-            <property name="text">
-             <string>Desde</string>
-            </property>
-            <property name="buddy">
-             <cstring>cbEdgeFrom</cstring>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QComboBox" name="cbEdgeFrom"/>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="lblEdgeTo">
-            <property name="text">
-             <string>Hacia</string>
-            </property>
-            <property name="buddy">
-             <cstring>cbEdgeTo</cstring>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QComboBox" name="cbEdgeTo"/>
-          </item>
-          <item row="2" column="0">
-           <widget class="QLabel" name="lblWeight">
-            <property name="text">
-             <string>Peso</string>
-            </property>
-            <property name="buddy">
-             <cstring>txtWeight</cstring>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="1">
-           <widget class="QLineEdit" name="txtWeight">
-            <property name="text">
-             <string>1</string>
-            </property>
-            <property name="toolTip">
-             <string>Número con coma o punto decimal, por ejemplo 2,5 o -3.</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0" colspan="2">
-           <widget class="QLabel" name="lblWeightError">
-            <property name="wordWrap">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="0" colspan="2">
-           <layout class="QHBoxLayout" name="layoutEdgeButtons">
-            <item>
-             <widget class="QPushButton" name="btnAddEdge">
-              <property name="text">
-               <string>Agregar arista</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="btnRemoveEdge">
-              <property name="text">
-               <string>Quitar</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <widget class="QGroupBox" name="grpAlgoritmo">
-         <property name="title">
-          <string>Camino más corto</string>
-         </property>
-         <layout class="QGridLayout" name="layoutAlgoritmo" columnstretch="0,1">
-          <item row="0" column="0" colspan="2">
-           <widget class="QRadioButton" name="rbtnDijkstra">
-            <property name="text">
-             <string>Dijkstra</string>
-            </property>
-            <property name="toolTip">
-             <string>Rápido, pero no admite pesos negativos.</string>
-            </property>
-            <property name="checked">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0" colspan="2">
-           <widget class="QRadioButton" name="rbtnBellman">
-            <property name="text">
-             <string>Bellman-Ford</string>
-            </property>
-            <property name="toolTip">
-             <string>Admite pesos negativos y detecta ciclos negativos.</string>
-            </property>
-           </widget>
-          </item>
-          <item row="2" column="0" colspan="2">
-           <widget class="QRadioButton" name="rbtnFloyd">
-            <property name="text">
-             <string>Floyd-Warshall</string>
-            </property>
-            <property name="toolTip">
-             <string>Admite pesos negativos y detecta ciclos negativos.</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0" colspan="2">
-           <widget class="QLabel" name="lblAlgoWarning">
-            <property name="wordWrap">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="0">
-           <widget class="QLabel" name="lblOrigin">
-            <property name="text">
-             <string>Origen</string>
-            </property>
-            <property name="buddy">
-             <cstring>cbOrigin</cstring>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="1">
-           <widget class="QComboBox" name="cbOrigin"/>
-          </item>
-          <item row="5" column="0">
-           <widget class="QLabel" name="lblDestination">
-            <property name="text">
-             <string>Destino</string>
-            </property>
-            <property name="buddy">
-             <cstring>cbDestination</cstring>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="1">
-           <widget class="QComboBox" name="cbDestination"/>
-          </item>
-          <item row="6" column="0" colspan="2">
-           <widget class="QPushButton" name="btnCalculate">
-            <property name="text">
-             <string>Calcular</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <spacer name="spacerSide">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>0</width>
-           <height>0</height>
-          </size>
-         </property>
-        </spacer>
+        <layout class="QHBoxLayout" name="layoutFooter">
+         <item>
+          <widget class="QPushButton" name="btnClearAll">
+           <property name="text">
+            <string>Borrar todo</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
-      </widget>
      </widget>
     </item>
    </layout>
@@ -397,6 +469,25 @@
    <container>0</container>
   </customwidget>
  </customwidgets>
+ <tabstops>
+  <tabstop>chkDirected</tabstop>
+  <tabstop>txtNodeName</tabstop>
+  <tabstop>chkUppercase</tabstop>
+  <tabstop>btnAddNode</tabstop>
+  <tabstop>btnRemoveLast</tabstop>
+  <tabstop>cbEdgeFrom</tabstop>
+  <tabstop>cbEdgeTo</tabstop>
+  <tabstop>txtWeight</tabstop>
+  <tabstop>btnAddEdge</tabstop>
+  <tabstop>btnRemoveEdge</tabstop>
+  <tabstop>rbtnDijkstra</tabstop>
+  <tabstop>rbtnBellman</tabstop>
+  <tabstop>rbtnFloyd</tabstop>
+  <tabstop>cbOrigin</tabstop>
+  <tabstop>cbDestination</tabstop>
+  <tabstop>btnCalculate</tabstop>
+  <tabstop>btnClearAll</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

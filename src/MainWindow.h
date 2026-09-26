@@ -24,6 +24,7 @@ public:
 
 protected:
     void showEvent(QShowEvent *event) override;
+    void changeEvent(QEvent *event) override;
 
 private slots:
     void onAddNode();
@@ -44,6 +45,9 @@ private:
     bool resultShown = false; // hay un resultado en el banner que el grafo actual puede invalidar
 
     void setupConnections();
+    void applyTheme();
+    void fitToScreen();
+    bool applyingTheme = false;
 
     // Nodos
     QString nextSuggestedName() const;

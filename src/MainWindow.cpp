@@ -3,10 +3,14 @@
 #include "Messages.h"
 #include "Weight.h"
 #include "Layout.h"
+#include "Theme.h"
 
 #include <QAbstractButton>
 #include <QComboBox>
-#include <QGraphicsDropShadowEffect>
+#include <QAbstractItemView>
+#include <QEvent>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -18,13 +22,6 @@
 #include <QStyle>
 
 namespace {
-const char *kWindowStyle =
-        "QLineEdit[error=\"true\"] { border: 2px solid #d64545; border-radius: 3px; padding: 1px; }"
-        "QLabel#lblNodeError, QLabel#lblWeightError { color: #e04848; }"
-        "QLabel#lblAlgoWarning { background: rgba(209, 139, 0, 0.14);"
-        "  border-left: 4px solid #d18b00; border-radius: 3px; padding: 6px; }"
-        "QLabel#lblNodeHint { color: palette(placeholder-text); }";
-
 // Pide confirmación para una acción que borra datos. «Cancelar» es la opción por defecto.
 bool confirmDestructive(QWidget *parent, const Msg::Message &m, const QString &acceptText) {
     QMessageBox box(QMessageBox::Warning, m.title, m.title, QMessageBox::NoButton, parent);
@@ -41,7 +38,6 @@ bool confirmDestructive(QWidget *parent, const Msg::Message &m, const QString &a
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow) {
     ui->setupUi(this);
-    setStyleSheet(kWindowStyle);
     ui->txtNodeName->setMaxLength(1);
     ui->txtNodeName->setValidator(new QRegularExpressionValidator(
             QRegularExpression(QStringLiteral("[A-Za-z]")), ui->txtNodeName));
@@ -49,29 +45,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->txtWeight->setValidator(new QRegularExpressionValidator(
             QRegularExpression(QStringLiteral(R"([+-]?\d{0,10}([.,]\d{0,6})?)")), ui->txtWeight));
 
-    // Sombra cian y efecto presionado para botones
-    auto stylizeButton = [](QAbstractButton *btn) {
-        auto *shadow = new QGraphicsDropShadowEffect(btn);
-        shadow->setBlurRadius(0);
-        shadow->setOffset(2, 2);
-        shadow->setColor(QColor("#00B2A9"));
-        btn->setGraphicsEffect(shadow);
-        btn->setStyleSheet(
-                "QPushButton { color: white; }"
-                "QPushButton:hover { color: black; }"
-                "QPushButton:pressed { color: black; }"
-                "QPushButton:disabled { color: #7a7f87; }"
-        );
-        QObject::connect(btn, &QAbstractButton::pressed, btn, [shadow]() {
-            shadow->setOffset(0, 0);
-        });
-        QObject::connect(btn, &QAbstractButton::released, btn, [shadow]() {
-            shadow->setOffset(2, 2);
-        });
-    };
-    for (QAbstractButton *b : QList<QAbstractButton *>{ui->btnCalculate, ui->btnAddNode, ui->btnRemoveLast,
-                                                       ui->btnClearAll, ui->btnAddEdge, ui->btnRemoveEdge})
-        stylizeButton(b);
+    applyTheme();
+    fitToScreen();
 
     graph.setDirected(ui->chkDirected->isChecked());
     ui->graphView->setGraph(&graph);
@@ -84,6 +59,57 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 MainWindow::~MainWindow() { delete ui; }
+
+// --------------------- Apariencia ---------------------
+void MainWindow::applyTheme() {
+    if (applyingTheme) return;
+    applyingTheme = true;
+
+    ui->lblTitle->setFont(Theme::title());
+    ui->lblSubtitle->setFont(Theme::caption());
+    ui->lblSubtitle->setProperty("role", "secondary");
+    for (QLabel *l : {ui->lblResultCaption, ui->lblSectionBuild, ui->lblSectionEdge, ui->lblSectionCalc})
+        l->setFont(Theme::headline());
+    for (QLabel *l : {ui->lblEdgeFrom, ui->lblEdgeTo, ui->lblWeight, ui->lblOrigin, ui->lblDestination}) {
+        l->setFont(Theme::caption());
+        l->setProperty("role", "secondary");
+    }
+    for (QLabel *l : {ui->lblNodeError, ui->lblWeightError}) {
+        l->setFont(Theme::caption());
+        l->setProperty("role", "error");
+    }
+    ui->lblAlgoWarning->setFont(Theme::caption());
+    ui->lblAlgoWarning->setProperty("role", "warning");
+    for (QFrame *f : {ui->sepBuild, ui->sepEdge, ui->sepFooter}) f->setProperty("role", "separator");
+
+    ui->btnCalculate->setProperty("role", "primary");
+    ui->btnClearAll->setProperty("role", "destructive");
+
+    const QString sheet = Theme::styleSheet();
+    setStyleSheet(sheet);
+    for (QComboBox *cb : findChildren<QComboBox *>())
+        if (cb->view()) cb->view()->setStyleSheet(sheet);
+    ui->resultBanner->refreshStyle();
+    ui->graphView->update();
+
+    applyingTheme = false;
+}
+
+void MainWindow::changeEvent(QEvent *event) {
+    QMainWindow::changeEvent(event);
+    // Seguir la apariencia clara/oscura del sistema si cambia con la app abierta.
+    if (event->type() == QEvent::PaletteChange || event->type() == QEvent::ApplicationPaletteChange)
+        applyTheme();
+}
+
+void MainWindow::fitToScreen() {
+    QScreen *screen = this->screen() ? this->screen() : QGuiApplication::primaryScreen();
+    if (!screen) return;
+    const QRect avail = screen->availableGeometry();
+    const QSize size = QSize(1180, 780).boundedTo(avail.size() - QSize(40, 40));
+    resize(size);
+    move(avail.center() - QPoint(size.width() / 2, size.height() / 2));
+}
 
 void MainWindow::setupConnections() {
     connect(ui->btnAddNode, &QPushButton::clicked, this, &MainWindow::onAddNode);
@@ -384,7 +410,6 @@ void MainWindow::setFieldError(QLineEdit *field, QLabel *label, const QString &e
 void MainWindow::setButtonEnabled(QAbstractButton *button, bool enabled, const QString &reason) {
     button->setEnabled(enabled);
     button->setToolTip(enabled ? QString() : reason);
-    if (auto *effect = button->graphicsEffect()) effect->setEnabled(enabled);
 }
 
 // --------------------- Cálculo ---------------------

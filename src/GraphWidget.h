@@ -8,6 +8,7 @@
 #include "Layout.h"
 
 class Graph;
+class QPainter;
 
 // Lienzo que dibuja un Graph. No guarda copia de nodos ni aristas:
 // siempre pinta el estado actual del modelo.
@@ -45,11 +46,18 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void contextMenuEvent(QContextMenuEvent *event) override;
+    void leaveEvent(QEvent *event) override;
 
 private:
+    void drawEmptyState(QPainter &g) const;
+    void drawEdges(QPainter &g) const;
+    void drawNodes(QPainter &g) const;
+
     const Graph *m_graph = nullptr;
     QVector<QPair<int, int>> m_highlighted;
     Highlight m_highlightKind = Highlight::Path;
+    QVector<int> m_highlightedNodes;
+    int m_hoverNode = -1;
 
     static constexpr int dragThreshold = 4;
     int m_pressedNode = -1;
