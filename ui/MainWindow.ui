@@ -441,6 +441,13 @@
        <item>
         <layout class="QHBoxLayout" name="layoutFooter">
          <item>
+          <widget class="QPushButton" name="btnUndo">
+           <property name="text">
+            <string>Deshacer</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="btnClearAll">
            <property name="text">
             <string>Borrar todo</string>
@@ -486,6 +493,7 @@
   <tabstop>cbOrigin</tabstop>
   <tabstop>cbDestination</tabstop>
   <tabstop>btnCalculate</tabstop>
+  <tabstop>btnUndo</tabstop>
   <tabstop>btnClearAll</tabstop>
  </tabstops>
  <resources/>

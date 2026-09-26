@@ -34,7 +34,9 @@ private slots:
     void onPlacementBlocked();
     void onAddEdge();
     void onRemoveEdge();
+    void onNodeDragStarted(int index);
     void onNodeDragged(int index, const QPointF &normalizedPos);
+    void onUndo();
     void onNodeMenuRequested(int index, const QPoint &globalPos);
     void onCalculate();
     void onDirectedToggled(bool checked);
@@ -43,6 +45,15 @@ private:
     Ui::MainWindow *ui;
     Graph graph;
     bool resultShown = false; // hay un resultado en el banner que el grafo actual puede invalidar
+
+    // Deshacer: copia del grafo antes de cada cambio, con la acción que lo produjo.
+    struct UndoEntry {
+        Graph graph;
+        QString action;
+    };
+    static constexpr int MaxUndo = 64;
+    QVector<UndoEntry> undoStack;
+    void pushUndo(const QString &action, const std::optional<Graph> &snapshot = std::nullopt);
 
     void setupConnections();
     void applyTheme();

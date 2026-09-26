@@ -35,6 +35,8 @@ signals:
     void canvasClicked(const QPointF &normalizedPos);
     // Clic demasiado cerca de un nodo existente: no cabe otro ahí.
     void placementBlocked();
+    // Empieza el arrastre de un nodo (una vez por arrastre).
+    void nodeDragStarted(int index);
     // Arrastre de un nodo a una nueva posición normalizada.
     void nodeDragged(int index, const QPointF &normalizedPos);
     // Clic derecho sobre un nodo.

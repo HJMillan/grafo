@@ -11,6 +11,7 @@
 #include <QEvent>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QShortcut>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -118,9 +119,13 @@ void MainWindow::setupConnections() {
     connect(ui->btnAddEdge, &QPushButton::clicked, this, &MainWindow::onAddEdge);
     connect(ui->btnRemoveEdge, &QPushButton::clicked, this, &MainWindow::onRemoveEdge);
     connect(ui->btnCalculate, &QPushButton::clicked, this, &MainWindow::onCalculate);
+    connect(ui->btnUndo, &QPushButton::clicked, this, &MainWindow::onUndo);
+    auto *undoShortcut = new QShortcut(QKeySequence::Undo, this);
+    connect(undoShortcut, &QShortcut::activated, this, &MainWindow::onUndo);
     connect(ui->chkDirected, &QCheckBox::toggled, this, &MainWindow::onDirectedToggled);
     connect(ui->graphView, &GraphWidget::canvasClicked, this, &MainWindow::onCanvasClicked);
     connect(ui->graphView, &GraphWidget::placementBlocked, this, &MainWindow::onPlacementBlocked);
+    connect(ui->graphView, &GraphWidget::nodeDragStarted, this, &MainWindow::onNodeDragStarted);
     connect(ui->graphView, &GraphWidget::nodeDragged, this, &MainWindow::onNodeDragged);
     connect(ui->graphView, &GraphWidget::nodeMenuRequested, this, &MainWindow::onNodeMenuRequested);
 
@@ -170,6 +175,7 @@ bool MainWindow::addNode(const QPointF &pos, bool autoPlaced) {
         return false;
     }
     const QString name = typed.isEmpty() ? nextSuggestedName() : typed;
+    pushUndo(Msg::undoAddNode(name));
     graph.addNode(name, pos, autoPlaced);
     if (autoPlaced) relayoutAutoPlaced();
     ui->txtNodeName->clear();
@@ -217,6 +223,7 @@ void MainWindow::onRemoveLast() {
 }
 
 void MainWindow::removeNode(int index) {
+    pushUndo(Msg::undoRemoveNode(graph.node(index).name));
     const bool wasAuto = graph.node(index).autoPlaced;
     graph.removeNode(index);
     if (wasAuto) relayoutAutoPlaced();
@@ -239,6 +246,10 @@ void MainWindow::onNodeMenuRequested(int index, const QPoint &globalPos) {
     removeNode(index);
 }
 
+void MainWindow::onNodeDragStarted(int index) {
+    pushUndo(Msg::undoMoveNode(graph.node(index).name));
+}
+
 void MainWindow::onNodeDragged(int index, const QPointF &normalizedPos) {
     // Mover un nodo no cambia distancias: no invalida el resultado.
     graph.setNodePos(index, normalizedPos);
@@ -251,6 +262,7 @@ void MainWindow::onClearAll() {
     if (!confirmDestructive(this, Msg::confirmClearAll(graph.nodeCount(), graph.edgeList().size()),
                             Msg::confirmClearAllAccept()))
         return;
+    pushUndo(Msg::undoClearAll());
     graph.clear();
     refreshNodeSelectors();
     graphChanged();
@@ -287,6 +299,8 @@ void MainWindow::onAddEdge() {
     const WeightCheck w = checkWeight();
     if (from < 0 || to < 0 || !w.value) return; // el botón ya estaba desactivado
 
+    const QString label = Msg::edge(graph, {from, to, *w.value});
+    pushUndo(graph.hasEdge(from, to) ? Msg::undoChangeWeight(label) : Msg::undoAddEdge(label));
     graph.setEdge(from, to, *w.value);
     graphChanged();
 }
@@ -295,11 +309,13 @@ void MainWindow::onRemoveEdge() {
     const int from = ui->cbEdgeFrom->currentIndex();
     const int to = ui->cbEdgeTo->currentIndex();
     if (from < 0 || to < 0 || !graph.hasEdge(from, to)) return; // el botón ya estaba desactivado
+    pushUndo(Msg::undoRemoveEdge(Msg::edge(graph, {from, to, 0.0})));
     graph.removeEdge(from, to);
     graphChanged();
 }
 
 void MainWindow::onDirectedToggled(bool checked) {
+    const Graph before = graph;
     if (!checked) {
         // Pasar a no dirigido solo es posible si todas las aristas son simétricas
         // y no negativas; si no, hay que borrarlas o cancelar.
@@ -316,7 +332,29 @@ void MainWindow::onDirectedToggled(bool checked) {
         }
     }
     graph.setDirected(checked);
+    pushUndo(Msg::undoSetDirected(checked), before);
     graphChanged();
+}
+
+// --------------------- Deshacer ---------------------
+void MainWindow::pushUndo(const QString &action, const std::optional<Graph> &snapshot) {
+    undoStack.append({snapshot ? *snapshot : graph, action});
+    if (undoStack.size() > MaxUndo) undoStack.removeFirst();
+}
+
+void MainWindow::onUndo() {
+    if (undoStack.isEmpty()) return;
+    const UndoEntry entry = undoStack.takeLast();
+    graph = entry.graph;
+    {
+        QSignalBlocker block(ui->chkDirected);
+        ui->chkDirected->setChecked(graph.isDirected());
+    }
+    refreshNodeSelectors();
+    graphChanged();
+    const Msg::Message m = Msg::undone(entry.action, undoStack.isEmpty() ? QString() : undoStack.last().action);
+    ui->resultBanner->setMessage(ResultBanner::Info, m.title, m.text);
+    resultShown = true; // el próximo cambio reemplaza este aviso
 }
 
 // --------------------- Estado de la interfaz ---------------------
@@ -342,6 +380,8 @@ void MainWindow::updateControls() {
     setButtonEnabled(ui->btnAddNode, nameError.isEmpty(), nameError);
     setButtonEnabled(ui->btnRemoveLast, hasNodes, QStringLiteral("No hay nodos que borrar."));
     setButtonEnabled(ui->btnClearAll, hasNodes, QStringLiteral("No hay nodos que borrar."));
+    setButtonEnabled(ui->btnUndo, !undoStack.isEmpty(), Msg::nothingToUndo());
+    if (!undoStack.isEmpty()) ui->btnUndo->setToolTip(Msg::undoTooltip(undoStack.last().action));
 
     // Aristas: si ya existe, «Agregar» pasa a «Cambiar peso» y se puede quitar.
     const int from = ui->cbEdgeFrom->currentIndex();

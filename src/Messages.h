@@ -57,6 +57,19 @@ Message pathFound(const Graph &g, const QVector<int> &nodes, double distance, co
 Message noPath(const Graph &g, int src, int dest);
 Message negativeCycle(const Graph &g, int src, int dest, const QVector<int> &cycle, double weight);
 
+// ---------- Deshacer ----------
+QString undoAddNode(const QString &name);
+QString undoRemoveNode(const QString &name);
+QString undoMoveNode(const QString &name);
+QString undoClearAll();
+QString undoAddEdge(const QString &edge);
+QString undoChangeWeight(const QString &edge);
+QString undoRemoveEdge(const QString &edge);
+QString undoSetDirected(bool directed);
+QString undoTooltip(const QString &action);
+QString nothingToUndo();
+Message undone(const QString &action, const QString &nextAction);
+
 // ---------- Confirmaciones (ventanas modales) ----------
 Message confirmToUndirected(const Graph &g, const QVector<Graph::Edge> &asymmetric,
                             const QVector<Graph::Edge> &negatives);

@@ -174,6 +174,33 @@ Message negativeCycle(const Graph &g, int src, int dest, const QVector<int> &cyc
     return m;
 }
 
+// ---------- Deshacer ----------
+QString undoAddNode(const QString &name)    { return QStringLiteral("Agregar nodo «%1»").arg(name); }
+QString undoRemoveNode(const QString &name) { return QStringLiteral("Eliminar nodo «%1»").arg(name); }
+QString undoMoveNode(const QString &name)   { return QStringLiteral("Mover nodo «%1»").arg(name); }
+QString undoClearAll()                      { return QStringLiteral("Borrar todo"); }
+QString undoAddEdge(const QString &edge)    { return QStringLiteral("Agregar arista %1").arg(edge); }
+QString undoChangeWeight(const QString &edge) { return QStringLiteral("Cambiar peso de %1").arg(edge); }
+QString undoRemoveEdge(const QString &edge) { return QStringLiteral("Quitar arista %1").arg(edge); }
+QString undoSetDirected(bool directed) {
+    return directed ? QStringLiteral("Cambiar a grafo dirigido") : QStringLiteral("Cambiar a grafo no dirigido");
+}
+
+QString undoTooltip(const QString &action) {
+    return QStringLiteral("Deshacer «%1» (Ctrl+Z).").arg(action);
+}
+
+QString nothingToUndo() {
+    return QStringLiteral("No hay cambios que deshacer.");
+}
+
+Message undone(const QString &action, const QString &nextAction) {
+    return {QStringLiteral("Se deshizo «%1»").arg(action),
+            nextAction.isEmpty()
+                ? QStringLiteral("No quedan más cambios que deshacer.")
+                : QStringLiteral("Pulse «Deshacer» otra vez (Ctrl+Z) para deshacer «%1».").arg(nextAction)};
+}
+
 // ---------- Confirmaciones ----------
 Message confirmToUndirected(const Graph &g, const QVector<Graph::Edge> &asymmetric,
                             const QVector<Graph::Edge> &negatives) {
@@ -194,7 +221,7 @@ Message confirmToUndirected(const Graph &g, const QVector<Graph::Edge> &asymmetr
     return {QStringLiteral("¿Cambiar a grafo no dirigido?"),
             QStringLiteral("El grafo tiene %1. Un grafo no dirigido no puede representarlas, "
                            "así que para cambiar de modo hay que borrar todas las aristas. "
-                           "Los nodos se conservan.")
+                           "Los nodos se conservan, y puede recuperar las aristas con «Deshacer» (Ctrl+Z).")
                     .arg(reasons.join(QStringLiteral(" y ")))};
 }
 
@@ -202,7 +229,7 @@ QString confirmToUndirectedAccept() { return QStringLiteral("Borrar aristas y ca
 
 Message confirmClearAll(int nodes, int edges) {
     return {QStringLiteral("¿Borrar todo el grafo?"),
-            QStringLiteral("Se eliminarán %1 nodos y %2 aristas. Esta acción no se puede deshacer.")
+            QStringLiteral("Se eliminarán %1 nodos y %2 aristas. Puede recuperarlos con «Deshacer» (Ctrl+Z).")
                     .arg(nodes).arg(edges)};
 }
 

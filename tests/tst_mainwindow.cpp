@@ -312,6 +312,86 @@ private slots:
         QCOMPARE(origin->itemText(0), QString("A"));
         QCOMPARE(origin->itemText(1), QString("C"));
     }
+    // ---------- Deshacer ----------
+    void undo_disabledUntilSomethingChanges() {
+        QVERIFY(!button("btnUndo")->isEnabled());
+        QCOMPARE(button("btnUndo")->toolTip(), QString("No hay cambios que deshacer."));
+        addNodes(1);
+        QVERIFY(button("btnUndo")->isEnabled());
+        QCOMPARE(button("btnUndo")->toolTip(), QString("Deshacer «Agregar nodo «A»» (Ctrl+Z)."));
+    }
+
+    void undo_revertsStepByStepAndExplains() {
+        addNodes(2);
+        addEdge("A", "B", "4");
+        addEdge("A", "B", "6"); // cambio de peso
+        button("btnUndo")->click();
+        QCOMPARE(banner()->title(), QString("Se deshizo «Cambiar peso de A–B»"));
+        QVERIFY(banner()->text().contains("Agregar arista A–B"));
+        calculate("A", "B");
+        QCOMPARE(banner()->title(), QString("Distancia de A a B: 4"));
+        button("btnUndo")->click(); // quita la arista
+        calculate("A", "B");
+        QCOMPARE(banner()->title(), QString("No hay camino de A a B"));
+        button("btnUndo")->click(); // quita B
+        button("btnUndo")->click(); // quita A
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 0);
+        QVERIFY(!button("btnUndo")->isEnabled());
+        QCOMPARE(banner()->text(), QString("No quedan más cambios que deshacer."));
+    }
+
+    void undo_recoversClearAll() {
+        addNodes(3);
+        addEdge("A", "C", "2");
+        answerNextDialog("Borrar todo");
+        button("btnClearAll")->click();
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 0);
+        button("btnUndo")->click();
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 3);
+        calculate("A", "C");
+        QCOMPARE(banner()->title(), QString("Distancia de A a C: 2"));
+    }
+
+    void undo_restoresModeAndEdgesAfterSwitch() {
+        get<QCheckBox>("chkDirected")->setChecked(true);
+        addNodes(2);
+        addEdge("B", "A", "1");
+        answerNextDialog("Borrar aristas y cambiar");
+        get<QCheckBox>("chkDirected")->setChecked(false);
+        QVERIFY(!get<QCheckBox>("chkDirected")->isChecked());
+        button("btnUndo")->click();
+        QVERIFY(get<QCheckBox>("chkDirected")->isChecked()); // sin volver a preguntar
+        calculate("B", "A");
+        QCOMPARE(banner()->kind(), ResultBanner::Success);
+    }
+
+    void undo_restoresDraggedPosition() {
+        auto *canvas = get<GraphWidget>("graphView");
+        addNodes(1);
+        const Graph *g = canvas->graph();
+        const QPointF original = g->node(0).pos;
+        const QPoint start = canvas->canvasGeometry().toPixel(original).toPoint();
+        QTest::mousePress(canvas, Qt::LeftButton, {}, start);
+        for (const QPoint &p : {QPoint(150, 150), QPoint(200, 250)}) {
+            QMouseEvent move(QEvent::MouseMove, QPointF(p), canvas->mapToGlobal(QPointF(p)),
+                             Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+            QApplication::sendEvent(canvas, &move);
+        }
+        QTest::mouseRelease(canvas, Qt::LeftButton, {}, QPoint(200, 250));
+        QVERIFY(g->node(0).pos != original);
+        button("btnUndo")->click(); // un arrastre = un paso de deshacer
+        QCOMPARE(g->node(0).pos, original);
+        QVERIFY(g->node(0).autoPlaced);
+    }
+
+    void undo_ctrlZShortcut() {
+        addNodes(2);
+        w->activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(w));
+        button("btnCalculate")->setFocus(); // en un campo de texto, Ctrl+Z deshace lo escrito
+        QTest::keyClick(QApplication::focusWidget(), Qt::Key_Z, Qt::ControlModifier);
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 1);
+    }
 };
 
 QTEST_MAIN(TestMainWindow)

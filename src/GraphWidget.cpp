@@ -282,6 +282,7 @@ void GraphWidget::mouseMoveEvent(QMouseEvent *event) {
         if (!m_dragging && (p - m_pressPos).manhattanLength() > dragThreshold) {
             m_dragging = true;
             setCursor(Qt::ClosedHandCursor);
+            emit nodeDragStarted(m_pressedNode);
         }
         if (m_dragging) emit nodeDragged(m_pressedNode, canvasGeometry().toNormalized(p));
         return;
