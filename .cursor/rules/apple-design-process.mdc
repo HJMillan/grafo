@@ -1,0 +1,53 @@
+---
+description: Apple's four-phase design process and per-screen diagnostic for UI work
+globs: ui/**/*.ui,src/*Window*,src/*Widget*
+alwaysApply: false
+---
+
+# Apple Design Process
+
+Source: https://developer.apple.com/videos/play/wwdc2025/359/
+
+Work the phases in order; each builds on the previous. Never start with visual design.
+
+## Diagnostic — run this before changing anything
+
+A screen must answer all three questions instantly, without the user piecing them together:
+
+1. Where am I?
+2. What can I do?
+3. Where can I go from here?
+
+A screen can look good and still fail all three. Failure shows up as hesitation and confusion.
+
+## 1. Structure (information architecture)
+
+- Write down everything the product does — features, workflows, nice-to-haves. Don't judge or cut yet.
+- Imagine someone else using it: when and where, how it fits their routine, what genuinely helps and what gets in the way.
+- Only then clean up: remove what isn't essential, rename what isn't clear, group what naturally belongs together.
+
+If it isn't clear what's essential, it can't be communicated in the interface.
+
+## 2. Navigation
+
+- Every extra navigation entry is one more decision, and can present the product as more complex than it is.
+- Navigation is for navigating, **not for actions**. Put a primary action where people will actually use it.
+- Use explicit labels and familiar icons. Nobody should have to interact with something to learn what it does.
+- Give each screen a title stating where the user is — not branding, not a menu.
+
+## 3. Content
+
+- Never mix distinct content types in one list; split them into sections.
+- **Progressive disclosure**: show only what's needed to get started, reveal the rest on interaction.
+- Choose layout by function, not appearance. Lists are scannable and compact; grids and collections suit image sets.
+- Group content to cut decision overload: by time, by progress, or by pattern/relationship.
+
+## 4. Visual design (last)
+
+- **Squint test**: if your eye jumps to one element and misses the rest, hierarchy is missing.
+- Create a visual anchor — make the most important element larger or higher in contrast.
+- Prefer system text styles over hand-picked sizes, and honor user text-size preferences.
+- Text over imagery needs a subtle gradient or blur behind it for legibility.
+- Use semantic colors named by purpose (`label`, `secondarySystemBackground`), not literal colors, so they adapt to contrast and light/dark settings.
+
+Iterate. Not getting it right on the first pass is part of the process.
