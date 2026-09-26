@@ -42,6 +42,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     setStyleSheet(kWindowStyle);
     ui->txtNodeName->setMaxLength(1);
+    ui->txtNodeName->setValidator(new QRegularExpressionValidator(
+            QRegularExpression(QStringLiteral("[A-Za-z]")), ui->txtNodeName));
     // Solo signo, dígitos y un separador decimal (coma o punto).
     ui->txtWeight->setValidator(new QRegularExpressionValidator(
             QRegularExpression(QStringLiteral(R"([+-]?\d{0,10}([.,]\d{0,6})?)")), ui->txtWeight));
@@ -120,9 +122,10 @@ QString MainWindow::nodeNameError(const QString &typed) const {
         return nextSuggestedName().isEmpty() ? Msg::nodeNoFreeName(ui->chkUppercase->isChecked())
                                              : QString();
     }
-    if (typed.length() != 1 || !typed.at(0).isLetter()) return Msg::nodeNameInvalid();
+    const QChar c = typed.at(0);
+    const bool asciiLetter = (c >= u'A' && c <= u'Z') || (c >= u'a' && c <= u'z');
+    if (typed.length() != 1 || !asciiLetter) return Msg::nodeNameInvalid();
     if (graph.indexOf(typed) >= 0) {
-        const QChar c = typed.at(0);
         const QString swapped(c.isUpper() ? c.toLower() : c.toUpper());
         return Msg::nodeNameDuplicate(typed, graph.indexOf(swapped) < 0 ? swapped : QString());
     }

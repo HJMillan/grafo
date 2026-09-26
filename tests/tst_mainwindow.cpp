@@ -8,6 +8,7 @@
 #include <QRadioButton>
 #include <QTest>
 #include <QTimer>
+#include <QValidator>
 
 #include "GraphWidget.h"
 #include "MainWindow.h"
@@ -238,6 +239,17 @@ private slots:
         // Lejos: se crea.
         QTest::mouseClick(canvas, Qt::LeftButton, {}, QPoint(300, 200));
         QCOMPARE(get<QComboBox>("cbOrigin")->count(), 2);
+    }
+    void nodes_nameOnlyAcceptsAsciiLetters() {
+        const QValidator *v = get<QLineEdit>("txtNodeName")->validator();
+        QVERIFY(v);
+        for (QString bad : {QString("ñ"), QString("á"), QString("1"), QString("-")}) {
+            int pos = 0;
+            QCOMPARE(v->validate(bad, pos), QValidator::Invalid);
+        }
+        QString good("q");
+        int pos = 0;
+        QCOMPARE(v->validate(good, pos), QValidator::Acceptable);
     }
 };
 
