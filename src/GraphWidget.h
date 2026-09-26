@@ -18,7 +18,10 @@ public:
     static constexpr int nodeRadius = 22;
 
     void setGraph(const Graph *graph);
-    void highlightPath(const QVector<int> &path); // limpia el resaltado si path está vacío
+    enum class Highlight { Path, NegativeCycle };
+
+    // Resalta las aristas consecutivas de path; lo limpia si path está vacío.
+    void highlightPath(const QVector<int> &path, Highlight kind = Highlight::Path);
 
 signals:
     void canvasClicked(const QPoint &pos);
@@ -30,6 +33,7 @@ protected:
 private:
     const Graph *m_graph = nullptr;
     QVector<QPair<int, int>> m_highlighted;
+    Highlight m_highlightKind = Highlight::Path;
 };
 
 #endif // GRAPHWIDGET_H

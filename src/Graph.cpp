@@ -88,7 +88,8 @@ QVector<Graph::Edge> Graph::asymmetricArcs() const {
     QVector<Edge> out;
     for (const Edge &e : arcs()) {
         const auto &rev = m_adj[e.to][e.from];
-        if (!rev || *rev != e.weight) out.append(e);
+        // Si existe la vuelta con otro peso, la pareja se cuenta una sola vez.
+        if (!rev || (e.from < e.to && *rev != e.weight)) out.append(e);
     }
     return out;
 }

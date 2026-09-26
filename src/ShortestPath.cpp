@@ -19,11 +19,72 @@ double cycleWeight(const Graph &g, const QVector<int> &cycle) {
     return w;
 }
 
-PathResult negativeCycleResult(const Graph &g, QVector<int> cycle) {
+// Nodos alcanzables desde start siguiendo las aristas hacia delante
+// (forward = true) o hacia atrás (forward = false).
+QVector<bool> reachable(const Graph &g, int start, bool forward) {
+    const int n = g.nodeCount();
+    QVector<bool> seen(n, false);
+    QVector<int> stack{start};
+    seen[start] = true;
+    while (!stack.isEmpty()) {
+        const int u = stack.takeLast();
+        for (int v = 0; v < n; ++v) {
+            const bool arc = forward ? g.hasEdge(u, v) : g.hasEdge(v, u);
+            if (arc && !seen[v]) {
+                seen[v] = true;
+                stack.append(v);
+            }
+        }
+    }
+    return seen;
+}
+
+// Busca un ciclo negativo formado solo por nodos que se alcanzan desde src
+// y desde los que se llega a dest, es decir, un ciclo que afecta al camino.
+// Devuelve el ciclo con el primer nodo repetido al final, o vacío si no hay.
+QVector<int> findNegativeCycleAffecting(const Graph &g, int src, int dest) {
+    const int n = g.nodeCount();
+    const QVector<bool> fromSrc = reachable(g, src, true);
+    const QVector<bool> toDest = reachable(g, dest, false);
+    QVector<Graph::Edge> arcs;
+    for (const auto &e : g.arcs())
+        if (fromSrc[e.from] && toDest[e.from] && fromSrc[e.to] && toDest[e.to]) arcs.append(e);
+
+    // Bellman-Ford con fuente virtual: todas las distancias parten de 0.
+    QVector<double> dist(n, 0.0);
+    QVector<int> prev(n, -1);
+    int last = -1;
+    for (int it = 0; it < n; ++it) {
+        last = -1;
+        for (const auto &e : arcs) {
+            if (dist[e.from] + e.weight < dist[e.to]) {
+                dist[e.to] = dist[e.from] + e.weight;
+                prev[e.to] = e.from;
+                last = e.to;
+            }
+        }
+        if (last == -1) return {};
+    }
+
+    // Retroceder n pasos garantiza caer dentro del ciclo.
+    int x = last;
+    for (int i = 0; i < n && x != -1; ++i) x = prev[x];
+    if (x == -1) return {};
+
+    QVector<int> cycle;
+    for (int v = x;; v = prev[v]) {
+        if (v == -1 || cycle.size() > n) return {};
+        cycle.prepend(v);
+        if (v == x && cycle.size() > 1) break;
+    }
+    return cycle;
+}
+
+PathResult negativeCycleResult(const Graph &g, int src, int dest) {
     PathResult r;
     r.status = PathResult::NegativeCycle;
-    if (!cycle.isEmpty()) r.distance = cycleWeight(g, cycle);
-    r.path = std::move(cycle);
+    r.path = findNegativeCycleAffecting(g, src, dest);
+    if (!r.path.isEmpty()) r.distance = cycleWeight(g, r.path);
     return r;
 }
 }
@@ -83,32 +144,19 @@ PathResult bellmanFord(const Graph &g, int src, int dest) {
         if (!changed) break;
     }
 
-    int cycleNode = -1;
-    for (const auto &e : arcs) {
-        if (dist[e.from] != INF && dist[e.from] + e.weight < dist[e.to]) {
-            prev[e.to] = e.from;
-            cycleNode = e.to;
-            break;
-        }
-    }
-
-    if (cycleNode != -1) {
-        // Retroceder n pasos garantiza caer dentro del ciclo.
-        for (int i = 0; i < n && cycleNode != -1; ++i) cycleNode = prev[cycleNode];
-
-        QVector<int> cycle;
-        if (cycleNode != -1) {
-            for (int v = cycleNode;; v = prev[v]) {
-                cycle.prepend(v);
-                if (v == cycleNode && cycle.size() > 1) break;
-                if (prev[v] == -1 || cycle.size() > n + 1) {
-                    cycle.clear();
-                    break;
-                }
+    // Propagar «-infinito» desde las aristas que aún se relajan: esos nodos
+    // tienen distancia no acotada. Si llega al destino, el ciclo afecta al camino.
+    QVector<bool> unbounded(n, false);
+    for (int it = 0; it < n; ++it) {
+        for (const auto &e : arcs) {
+            if (dist[e.from] == INF) continue;
+            if (unbounded[e.from] || dist[e.from] + e.weight < dist[e.to]) {
+                if (!unbounded[e.from]) dist[e.to] = dist[e.from] + e.weight;
+                unbounded[e.to] = true;
             }
         }
-        return negativeCycleResult(g, cycle);
     }
+    if (unbounded[dest]) return negativeCycleResult(g, src, dest);
 
     PathResult r;
     if (dist[dest] == INF) return r;
@@ -147,20 +195,11 @@ PathResult floydWarshall(const Graph &g, int src, int dest) {
             }
         }
 
-    for (int i = 0; i < n; ++i) {
-        if (dist[i][i] >= 0) continue;
-        QVector<int> cycle;
-        int u = i;
-        do {
-            cycle.append(u);
-            u = next[u][i];
-            if (u == -1 || cycle.size() > n) {
-                cycle.clear();
-                break;
-            }
-        } while (u != i);
-        if (!cycle.isEmpty()) cycle.append(i);
-        return negativeCycleResult(g, cycle);
+    // Hay un ciclo negativo que afecta al camino si algún nodo k de un ciclo
+    // negativo se alcanza desde el origen y desde él se llega al destino.
+    for (int k = 0; k < n; ++k) {
+        if (dist[k][k] < 0 && dist[src][k] != INF && dist[k][dest] != INF)
+            return negativeCycleResult(g, src, dest);
     }
 
     PathResult r;

@@ -47,7 +47,8 @@ void GraphWidget::setGraph(const Graph *graph) {
     update();
 }
 
-void GraphWidget::highlightPath(const QVector<int> &path) {
+void GraphWidget::highlightPath(const QVector<int> &path, Highlight kind) {
+    m_highlightKind = kind;
     m_highlighted.clear();
     for (int i = 0; i + 1 < path.size(); ++i) m_highlighted.append({path[i], path[i + 1]});
     update();
@@ -63,7 +64,7 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
     g.fillRect(rect(), QColor("#0b0f14"));
 
     const QColor edgeColor(225,230,238);
-    const QColor edgeHiColor("#00B2A9");
+    const QColor edgeHiColor(m_highlightKind == Highlight::NegativeCycle ? "#e04848" : "#00B2A9");
     const int edgeW = 2;
     const int edgeHiW = 4;
 

@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include "ui_MainWindow.h"
 #include "Messages.h"
+#include "Weight.h"
 
 #include <QAbstractButton>
 #include <QComboBox>
@@ -9,6 +10,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QRegularExpressionValidator>
 #include <QCheckBox>
 #include <QSignalBlocker>
 #include <QStyle>
@@ -40,6 +42,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     setStyleSheet(kWindowStyle);
     ui->txtNodeName->setMaxLength(1);
+    // Solo signo, dígitos y un separador decimal (coma o punto).
+    ui->txtWeight->setValidator(new QRegularExpressionValidator(
+            QRegularExpression(QStringLiteral(R"([+-]?\d{0,10}([.,]\d{0,6})?)")), ui->txtWeight));
 
     // Sombra cian y efecto presionado para botones
     auto stylizeButton = [](QAbstractButton *btn) {
@@ -195,14 +200,24 @@ void MainWindow::onClearAll() {
 // --------------------- Aristas ---------------------
 MainWindow::WeightCheck MainWindow::checkWeight() const {
     const QString text = ui->txtWeight->text().trimmed();
-    if (text.isEmpty()) return {std::nullopt, Msg::weightEmpty()};
+    const WeightParse p = parseWeight(text);
+    switch (p.error) {
+    case WeightParse::Empty:      return {std::nullopt, Msg::weightEmpty()};
+    case WeightParse::NotNumber:  return {std::nullopt, Msg::weightNotNumber(text)};
+    case WeightParse::NotFinite:  return {std::nullopt, Msg::weightNotFinite()};
+    case WeightParse::OutOfRange: return {std::nullopt, Msg::weightOutOfRange(WeightParse::MaxAbs)};
+    case WeightParse::None:       break;
+    }
 
-    bool ok = false;
-    const double w = text.toDouble(&ok);
-    if (!ok) return {std::nullopt, Msg::weightNotNumber(text)};
-
-    if (w < 0 && ui->rbtnDijkstra->isChecked()) return {std::nullopt, Msg::weightNegativeDijkstra()};
-    return {w, {}};
+    if (p.value < 0) {
+        // En no dirigido ningún algoritmo sirve, así que este aviso va primero.
+        if (!graph.isDirected()) {
+            return {std::nullopt, Msg::weightNegativeUndirected(ui->cbEdgeFrom->currentText(),
+                                                                ui->cbEdgeTo->currentText(), p.value)};
+        }
+        if (ui->rbtnDijkstra->isChecked()) return {std::nullopt, Msg::weightNegativeDijkstra()};
+    }
+    return {p.value, {}};
 }
 
 void MainWindow::onAddEdge() {
@@ -216,11 +231,23 @@ void MainWindow::onAddEdge() {
 }
 
 void MainWindow::onDirectedToggled(bool checked) {
+    if (!checked) {
+        // Pasar a no dirigido solo es posible si todas las aristas son simétricas
+        // y no negativas; si no, hay que borrarlas o cancelar.
+        const auto asymmetric = graph.asymmetricArcs();
+        const auto negatives = graph.negativeEdges();
+        if (!asymmetric.isEmpty() || !negatives.isEmpty()) {
+            if (!confirmDestructive(this, Msg::confirmToUndirected(graph, asymmetric, negatives),
+                                    Msg::confirmToUndirectedAccept())) {
+                QSignalBlocker block(ui->chkDirected);
+                ui->chkDirected->setChecked(true);
+                return;
+            }
+            graph.clearEdges();
+        }
+    }
     graph.setDirected(checked);
     graphChanged();
-    ui->resultBanner->setMessage(ResultBanner::Warning, QStringLiteral("Modo del grafo cambiado"),
-                                 QStringLiteral("Las aristas existentes no se modificaron. Si las creó en el "
-                                                "otro modo, borre el grafo y vuelva a crearlas."));
 }
 
 // --------------------- Estado de la interfaz ---------------------
@@ -255,9 +282,16 @@ void MainWindow::updateControls() {
     else
         setButtonEnabled(ui->btnAddEdge, w.value.has_value(), w.error);
 
-    // Cálculo
-    setButtonEnabled(ui->btnCalculate, hasNodes, Msg::needsNodesForCalculate());
-    ui->lblAlgoWarning->setVisible(!ui->lblAlgoWarning->text().isEmpty());
+    // Cálculo: Dijkstra queda bloqueado mientras existan aristas negativas.
+    const auto negatives = graph.negativeEdges();
+    const QString algoWarning = ui->rbtnDijkstra->isChecked() && !negatives.isEmpty()
+            ? Msg::dijkstraWithNegatives(graph, negatives) : QString();
+    ui->lblAlgoWarning->setText(algoWarning);
+    ui->lblAlgoWarning->setVisible(!algoWarning.isEmpty());
+    if (!hasNodes)
+        setButtonEnabled(ui->btnCalculate, false, Msg::needsNodesForCalculate());
+    else
+        setButtonEnabled(ui->btnCalculate, algoWarning.isEmpty(), algoWarning);
 }
 
 void MainWindow::setFieldError(QLineEdit *field, QLabel *label, const QString &error) {
@@ -321,6 +355,8 @@ void MainWindow::showResult(const PathResult &result, int src, int dest) {
         ui->resultBanner->setMessage(ResultBanner::Error, m.title, m.text);
         break;
     }
-    ui->graphView->highlightPath(result.path);
+    ui->graphView->highlightPath(result.path, result.status == PathResult::NegativeCycle
+                                                      ? GraphWidget::Highlight::NegativeCycle
+                                                      : GraphWidget::Highlight::Path);
     resultShown = true;
 }

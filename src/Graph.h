@@ -54,7 +54,7 @@ public:
 
     bool isSymmetric() const;
     QVector<Edge> negativeEdges() const;   // según el modo actual
-    QVector<Edge> asymmetricArcs() const;  // arcos sin su inverso de igual peso
+    QVector<Edge> asymmetricArcs() const;  // arcos sin inverso, o con inverso de otro peso (una vez por pareja)
 
 private:
     QVector<Node> m_nodes;

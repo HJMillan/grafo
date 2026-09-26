@@ -3,6 +3,7 @@
 
 #include "Graph.h"
 #include "ShortestPath.h"
+#include "Weight.h"
 
 namespace {
 // Crea un grafo con nodos A, B, C... y las aristas indicadas como "AB:2.5".
@@ -71,7 +72,7 @@ private slots:
     void graph_asymmetricArcs() {
         Graph g = makeGraph(3, true, {"AB:1", "BA:1", "BC:2", "CB:3"});
         QVERIFY(!g.isSymmetric());
-        QCOMPARE(g.asymmetricArcs().size(), 2); // B->C y C->B difieren
+        QCOMPARE(g.asymmetricArcs().size(), 1); // B->C y C->B difieren: una pareja
         g.removeEdge(n('C'), n('B'));
         g.setEdge(n('C'), n('B'), 2);
         QVERIFY(g.isSymmetric());
@@ -178,6 +179,90 @@ private slots:
         QCOMPARE(r.status, PathResult::NegativeCycle);
         QCOMPARE(r.path, (QVector<int>{1, 1}));
         QCOMPARE(r.distance, -1.0);
+    }
+
+    // Criterio común: solo hay error si el ciclo afecta al camino origen→destino.
+    void negativeCycle_notReachableFromSource_data() { addNegativeCapable(); }
+    void negativeCycle_notReachableFromSource() {
+        QFETCH(int, algo);
+        // Ciclo C⇄D negativo, pero no se alcanza desde A.
+        Graph g = makeGraph(4, true, {"AB:2", "CD:-3", "DC:1"});
+        const PathResult r = run(algo, g, n('A'), n('B'));
+        QCOMPARE(r.status, PathResult::Ok);
+        QCOMPARE(r.distance, 2.0);
+    }
+
+    void negativeCycle_doesNotReachDestination_data() { addNegativeCapable(); }
+    void negativeCycle_doesNotReachDestination() {
+        QFETCH(int, algo);
+        // Desde A se alcanza el ciclo B⇄C, pero desde el ciclo no se llega a D.
+        Graph g = makeGraph(4, true, {"AB:1", "BC:-2", "CB:1", "AD:3"});
+        const PathResult r = run(algo, g, n('A'), n('D'));
+        QCOMPARE(r.status, PathResult::Ok);
+        QCOMPARE(r.distance, 3.0);
+        QCOMPARE(r.path, (QVector<int>{0, 3}));
+    }
+
+    void negativeCycle_reportsTheAffectingCycle_data() { addNegativeCapable(); }
+    void negativeCycle_reportsTheAffectingCycle() {
+        QFETCH(int, algo);
+        // Dos ciclos negativos alcanzables: B⇄C no llega a F; D⇄E sí.
+        Graph g = makeGraph(6, true, {"AB:1", "BC:-2", "CB:1", "AD:1", "DE:-2", "ED:1", "EF:1"});
+        const PathResult r = run(algo, g, n('A'), n('F'));
+        QCOMPARE(r.status, PathResult::NegativeCycle);
+        for (int v : r.path) QVERIFY2(v == n('D') || v == n('E'), "el ciclo debe ser D⇄E");
+        QCOMPARE(r.distance, -1.0);
+    }
+
+    void negativeCycle_bothAlgorithmsAgree() {
+        auto *rng = QRandomGenerator::global();
+        for (int iter = 0; iter < 300; ++iter) {
+            const int count = 2 + rng->bounded(7);
+            Graph g;
+            g.setDirected(true);
+            for (int i = 0; i < count; ++i) g.addNode(QString(QChar('A' + i)), {}, false);
+            for (int i = 0; i < count; ++i)
+                for (int j = 0; j < count; ++j)
+                    if (rng->bounded(4) == 0) g.setEdge(i, j, rng->bounded(12) - 3);
+            const int src = rng->bounded(count);
+            const int dst = rng->bounded(count);
+            const PathResult b = bellmanFord(g, src, dst);
+            const PathResult f = floydWarshall(g, src, dst);
+            QCOMPARE(f.status, b.status);
+            if (b.status == PathResult::Ok) QCOMPARE(f.distance, b.distance);
+            if (b.status == PathResult::NegativeCycle) {
+                QVERIFY(!b.path.isEmpty());
+                QVERIFY(b.distance < 0);
+                QCOMPARE(f.path, b.path); // misma reconstrucción
+            }
+        }
+    }
+
+    // ---------- Campo «Peso» ----------
+    void weight_parse_data() {
+        QTest::addColumn<QString>("text");
+        QTest::addColumn<int>("error");
+        QTest::addColumn<double>("value");
+        QTest::newRow("entero") << "3" << int(WeightParse::None) << 3.0;
+        QTest::newRow("coma") << "2,5" << int(WeightParse::None) << 2.5;
+        QTest::newRow("punto") << "2.5" << int(WeightParse::None) << 2.5;
+        QTest::newRow("negativo") << " -1,25 " << int(WeightParse::None) << -1.25;
+        QTest::newRow("vacío") << "  " << int(WeightParse::Empty) << 0.0;
+        QTest::newRow("solo signo") << "-" << int(WeightParse::NotNumber) << 0.0;
+        QTest::newRow("dos separadores") << "1,2.3" << int(WeightParse::NotNumber) << 0.0;
+        QTest::newRow("texto") << "abc" << int(WeightParse::NotNumber) << 0.0;
+        QTest::newRow("inf") << "inf" << int(WeightParse::NotFinite) << 0.0;
+        QTest::newRow("nan") << "nan" << int(WeightParse::NotFinite) << 0.0;
+        QTest::newRow("límite") << "1000000000" << int(WeightParse::None) << 1e9;
+        QTest::newRow("fuera de rango") << "1000000001" << int(WeightParse::OutOfRange) << 0.0;
+    }
+    void weight_parse() {
+        QFETCH(QString, text);
+        QFETCH(int, error);
+        QFETCH(double, value);
+        const WeightParse p = parseWeight(text);
+        QCOMPARE(int(p.error), error);
+        if (p.ok()) QCOMPARE(p.value, value);
     }
 };
 
