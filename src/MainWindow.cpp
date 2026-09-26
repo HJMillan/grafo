@@ -11,6 +11,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QMenu>
 #include <QRegularExpressionValidator>
 #include <QCheckBox>
 #include <QSignalBlocker>
@@ -69,7 +70,7 @@ MainWindow::MainWindow(QWidget *parent)
         });
     };
     for (QAbstractButton *b : QList<QAbstractButton *>{ui->btnCalculate, ui->btnAddNode, ui->btnRemoveLast,
-                                                       ui->btnClearAll, ui->btnAddEdge})
+                                                       ui->btnClearAll, ui->btnAddEdge, ui->btnRemoveEdge})
         stylizeButton(b);
 
     graph.setDirected(ui->chkDirected->isChecked());
@@ -89,10 +90,13 @@ void MainWindow::setupConnections() {
     connect(ui->btnRemoveLast, &QPushButton::clicked, this, &MainWindow::onRemoveLast);
     connect(ui->btnClearAll, &QPushButton::clicked, this, &MainWindow::onClearAll);
     connect(ui->btnAddEdge, &QPushButton::clicked, this, &MainWindow::onAddEdge);
+    connect(ui->btnRemoveEdge, &QPushButton::clicked, this, &MainWindow::onRemoveEdge);
     connect(ui->btnCalculate, &QPushButton::clicked, this, &MainWindow::onCalculate);
     connect(ui->chkDirected, &QCheckBox::toggled, this, &MainWindow::onDirectedToggled);
     connect(ui->graphView, &GraphWidget::canvasClicked, this, &MainWindow::onCanvasClicked);
     connect(ui->graphView, &GraphWidget::placementBlocked, this, &MainWindow::onPlacementBlocked);
+    connect(ui->graphView, &GraphWidget::nodeDragged, this, &MainWindow::onNodeDragged);
+    connect(ui->graphView, &GraphWidget::nodeMenuRequested, this, &MainWindow::onNodeMenuRequested);
 
     // Validación mientras se escribe o cambia el contexto
     connect(ui->txtNodeName, &QLineEdit::textChanged, this, &MainWindow::updateControls);
@@ -183,11 +187,37 @@ void MainWindow::relayoutAutoPlaced() {
 
 void MainWindow::onRemoveLast() {
     if (graph.nodeCount() == 0) return;
-    const bool wasAuto = graph.node(graph.nodeCount() - 1).autoPlaced;
-    graph.removeNode(graph.nodeCount() - 1);
+    removeNode(graph.nodeCount() - 1);
+}
+
+void MainWindow::removeNode(int index) {
+    const bool wasAuto = graph.node(index).autoPlaced;
+    graph.removeNode(index);
     if (wasAuto) relayoutAutoPlaced();
     refreshNodeSelectors();
     graphChanged();
+}
+
+void MainWindow::onNodeMenuRequested(int index, const QPoint &globalPos) {
+    const QString name = graph.node(index).name;
+    QMenu menu(this);
+    QAction *remove = menu.addAction(style()->standardIcon(QStyle::SP_TrashIcon), Msg::removeNodeAction(name));
+    if (menu.exec(globalPos) != remove) return;
+
+    int edges = 0;
+    for (const auto &e : graph.edgeList())
+        if (e.from == index || e.to == index) ++edges;
+    if (edges > 0 && !confirmDestructive(this, Msg::confirmRemoveNode(name, edges),
+                                         Msg::confirmRemoveNodeAccept()))
+        return;
+    removeNode(index);
+}
+
+void MainWindow::onNodeDragged(int index, const QPointF &normalizedPos) {
+    // Mover un nodo no cambia distancias: no invalida el resultado.
+    graph.setNodePos(index, normalizedPos);
+    graph.setNodeAutoPlaced(index, false); // el usuario decidió dónde va: queda fijo
+    ui->graphView->update();
 }
 
 void MainWindow::onClearAll() {
@@ -235,6 +265,14 @@ void MainWindow::onAddEdge() {
     graphChanged();
 }
 
+void MainWindow::onRemoveEdge() {
+    const int from = ui->cbEdgeFrom->currentIndex();
+    const int to = ui->cbEdgeTo->currentIndex();
+    if (from < 0 || to < 0 || !graph.hasEdge(from, to)) return; // el botón ya estaba desactivado
+    graph.removeEdge(from, to);
+    graphChanged();
+}
+
 void MainWindow::onDirectedToggled(bool checked) {
     if (!checked) {
         // Pasar a no dirigido solo es posible si todas las aristas son simétricas
@@ -279,7 +317,17 @@ void MainWindow::updateControls() {
     setButtonEnabled(ui->btnRemoveLast, hasNodes, QStringLiteral("No hay nodos que borrar."));
     setButtonEnabled(ui->btnClearAll, hasNodes, QStringLiteral("No hay nodos que borrar."));
 
-    // Aristas
+    // Aristas: si ya existe, «Agregar» pasa a «Cambiar peso» y se puede quitar.
+    const int from = ui->cbEdgeFrom->currentIndex();
+    const int to = ui->cbEdgeTo->currentIndex();
+    const bool edgeExists = from >= 0 && to >= 0 && graph.hasEdge(from, to);
+    ui->btnAddEdge->setText(Msg::addEdgeText(edgeExists));
+    if (!hasNodes)
+        setButtonEnabled(ui->btnRemoveEdge, false, Msg::needsNodesForEdge());
+    else
+        setButtonEnabled(ui->btnRemoveEdge, edgeExists,
+                         Msg::edgeMissing(ui->cbEdgeFrom->currentText(), ui->cbEdgeTo->currentText()));
+
     const WeightCheck w = checkWeight();
     setFieldError(ui->txtWeight, ui->lblWeightError, hasNodes ? w.error : QString());
     if (!hasNodes)
@@ -297,6 +345,29 @@ void MainWindow::updateControls() {
         setButtonEnabled(ui->btnCalculate, false, Msg::needsNodesForCalculate());
     else
         setButtonEnabled(ui->btnCalculate, algoWarning.isEmpty(), algoWarning);
+
+    fitWrappedLabels();
+}
+
+// Qt no propaga bien la altura de las etiquetas con salto de línea dentro de
+// los grupos del panel: se fija a mano para que ningún mensaje quede cortado.
+void MainWindow::fitWrappedLabels() {
+    for (QLabel *label : ui->panelSide->findChildren<QLabel *>()) {
+        if (!label->wordWrap() || label->isHidden()) continue;
+        const QLayout *layout = label->parentWidget()->layout();
+        const int width = layout ? layout->contentsRect().width() : label->width();
+        if (width <= 0) continue;
+        const int m = label->contentsMargins().left() + label->contentsMargins().right();
+        label->setMinimumHeight(label->heightForWidth(width) > 0
+                                    ? label->heightForWidth(width)
+                                    : label->fontMetrics().boundingRect(QRect(0, 0, width - m, 10000),
+                                                                        Qt::TextWordWrap, label->text()).height());
+    }
+}
+
+void MainWindow::showEvent(QShowEvent *event) {
+    QMainWindow::showEvent(event);
+    fitWrappedLabels();
 }
 
 void MainWindow::setFieldError(QLineEdit *field, QLabel *label, const QString &error) {

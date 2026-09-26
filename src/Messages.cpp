@@ -93,6 +93,20 @@ QString nodeOverlap() {
     return QStringLiteral("Ya hay un nodo en ese lugar. Haga clic en un espacio libre del lienzo.");
 }
 
+// ---------- Aristas ----------
+QString edgeMissing(const QString &from, const QString &to) {
+    return QStringLiteral("No existe una arista de %1 a %2.").arg(from, to);
+}
+
+QString addEdgeText(bool exists) {
+    return exists ? QStringLiteral("Cambiar peso") : QStringLiteral("Agregar arista");
+}
+
+// ---------- Menú del nodo ----------
+QString removeNodeAction(const QString &name) {
+    return QStringLiteral("Eliminar nodo «%1»").arg(name);
+}
+
 // ---------- Botones desactivados ----------
 QString needsNodesForEdge() {
     return QStringLiteral("Agregue al menos un nodo para crear aristas.");

@@ -36,6 +36,13 @@ QString nodeLimit(int max);
 QString nodeNoFreeName(bool uppercase);
 QString nodeOverlap();
 
+// ---------- Aristas ----------
+QString edgeMissing(const QString &from, const QString &to);
+QString addEdgeText(bool exists);   // «Agregar arista» o «Cambiar peso»
+
+// ---------- Menú del nodo ----------
+QString removeNodeAction(const QString &name);
+
 // ---------- Botones desactivados (tooltips) ----------
 QString needsNodesForEdge();
 QString needsNodesForCalculate();

@@ -22,6 +22,9 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+protected:
+    void showEvent(QShowEvent *event) override;
+
 private slots:
     void onAddNode();
     void onRemoveLast();
@@ -29,6 +32,9 @@ private slots:
     void onCanvasClicked(const QPointF &normalizedPos);
     void onPlacementBlocked();
     void onAddEdge();
+    void onRemoveEdge();
+    void onNodeDragged(int index, const QPointF &normalizedPos);
+    void onNodeMenuRequested(int index, const QPoint &globalPos);
     void onCalculate();
     void onDirectedToggled(bool checked);
 
@@ -44,6 +50,7 @@ private:
     QString nodeNameError(const QString &name) const;
     bool addNode(const QPointF &pos, bool autoPlaced);
     void relayoutAutoPlaced();
+    void removeNode(int index);
     void refreshNodeSelectors();
 
     // Aristas
@@ -56,6 +63,7 @@ private:
     // Estado de la interfaz
     void graphChanged();
     void updateControls();
+    void fitWrappedLabels();
     static void setFieldError(QLineEdit *field, QLabel *label, const QString &error);
     static void setButtonEnabled(QAbstractButton *button, bool enabled, const QString &reason = {});
 

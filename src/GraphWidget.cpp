@@ -1,5 +1,7 @@
 #include "GraphWidget.h"
 #include "Graph.h"
+#include "Messages.h"
+#include <QContextMenuEvent>
 #include <QPainter>
 #include <QPen>
 #include <QFont>
@@ -19,6 +21,13 @@ struct DrawEdge {
     bool hasReverse;
     double reverseWeight;
 };
+
+// Círculo del lazo, desplazado 10 px hacia arriba (o hacia abajo) del nodo.
+QRectF selfLoopRect(const QPointF &center, bool below) {
+    const double r = GraphWidget::nodeRadius + 12;
+    const double cy = center.y() + (below ? 10 : -10);
+    return QRectF(center.x() - r, cy - r, 2 * r, 2 * r);
+}
 
 QVector<DrawEdge> buildDrawEdges(const Graph &g) {
     QVector<DrawEdge> out;
@@ -40,6 +49,7 @@ QVector<DrawEdge> buildDrawEdges(const Graph &g) {
 GraphWidget::GraphWidget(QWidget *parent) : QFrame(parent) {
     setFrameShape(QFrame::NoFrame);
     setAttribute(Qt::WA_OpaquePaintEvent);
+    setMouseTracking(true); // para mostrar la mano al pasar sobre un nodo
 }
 
 CanvasGeometry GraphWidget::canvasGeometry() const {
@@ -90,6 +100,8 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
                         (e.hasReverse && m_highlighted.contains({e.to, e.from}));
 
         const bool selfLoop = (e.from == e.to);
+        // Cerca del borde superior el lazo y su etiqueta se dibujan debajo del nodo.
+        const bool loopBelow = ap.y() - nodeRadius - 45 < 0;
 
         if (hi) {
             QPen glow(edgeHiColor);
@@ -100,8 +112,7 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
             glow.setJoinStyle(Qt::RoundJoin);
             g.setPen(glow);
             if (selfLoop) {
-                QRectF loopRect(ap.x() - nodeRadius - 12, ap.y() - nodeRadius - 22,
-                                (nodeRadius + 12) * 2, (nodeRadius + 12) * 2);
+                const QRectF loopRect = selfLoopRect(ap, loopBelow);
                 g.drawArc(loopRect, 45 * 16, 270 * 16);
             } else {
                 g.drawLine(ap, bp);
@@ -113,8 +124,7 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
         g.setPen(pen);
         g.setBrush(Qt::NoBrush);
         if (selfLoop) {
-            QRectF loopRect(ap.x() - nodeRadius - 12, ap.y() - nodeRadius - 22,
-                            (nodeRadius + 12) * 2, (nodeRadius + 12) * 2);
+            const QRectF loopRect = selfLoopRect(ap, loopBelow);
             g.drawArc(loopRect, 45 * 16, 270 * 16);
         } else {
             g.drawLine(ap, bp);
@@ -155,17 +165,13 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
 
         QString txt;
         if (selfLoop) {
-            txt = QString("%1->%1=%2")
-                    .arg(nodes[e.from].name)
-                    .arg(e.weight, 0, 'f', 2);
+            txt = QString("%1→%1 = %2").arg(nodes[e.from].name, Msg::number(e.weight));
         } else if (e.directed && e.hasReverse) {
-            txt = QString("%1->%2=%3 / %2->%1=%4")
-                    .arg(nodes[e.from].name)
-                    .arg(nodes[e.to].name)
-                    .arg(e.weight, 0, 'f', 2)
-                    .arg(e.reverseWeight, 0, 'f', 2);
+            txt = QString("%1→%2 = %3 · %2→%1 = %4")
+                    .arg(nodes[e.from].name, nodes[e.to].name,
+                         Msg::number(e.weight), Msg::number(e.reverseWeight));
         } else {
-            txt = QString::number(e.weight, 'f', 2);
+            txt = Msg::number(e.weight);
         }
         const QSize ts  = wfm.size(Qt::TextSingleLine, txt);
         const int pad = 7;
@@ -173,7 +179,8 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
 
         QRect pill(0, 0, ts.width() + pad*2, ts.height() + pad);
         if (selfLoop) {
-            pill.moveCenter(QPointF(ap.x(), ap.y() - nodeRadius - 28).toPoint());
+            const double dy = nodeRadius + 28;
+            pill.moveCenter(QPointF(ap.x(), loopBelow ? ap.y() + dy : ap.y() - dy).toPoint());
         } else {
             pill.moveCenter((mid + n * 16.0).toPoint());
         }
@@ -229,8 +236,11 @@ void GraphWidget::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton && m_graph) {
         const QPointF p = event->position();
         const CanvasGeometry geo = canvasGeometry();
-        if (nodeNear(*m_graph, geo, p, nodeRadius) >= 0) {
-            // Clic sobre un nodo: no crea otro encima.
+        const int onNode = nodeNear(*m_graph, geo, p, nodeRadius);
+        if (onNode >= 0) {
+            // Sobre un nodo: puede empezar un arrastre; nunca crea otro encima.
+            m_pressedNode = onNode;
+            m_pressPos = p;
         } else if (nodeNear(*m_graph, geo, p, minNodeDistance) >= 0) {
             emit placementBlocked();
         } else {
@@ -238,4 +248,37 @@ void GraphWidget::mousePressEvent(QMouseEvent *event) {
         }
     }
     QFrame::mousePressEvent(event);
+}
+
+void GraphWidget::mouseMoveEvent(QMouseEvent *event) {
+    if (!m_graph) return;
+    const QPointF p = event->position();
+    if (m_pressedNode >= 0 && (event->buttons() & Qt::LeftButton)) {
+        // Un umbral pequeño distingue un clic de un arrastre.
+        if (!m_dragging && (p - m_pressPos).manhattanLength() > dragThreshold) {
+            m_dragging = true;
+            setCursor(Qt::ClosedHandCursor);
+        }
+        if (m_dragging) emit nodeDragged(m_pressedNode, canvasGeometry().toNormalized(p));
+        return;
+    }
+    const bool overNode = nodeNear(*m_graph, canvasGeometry(), p, nodeRadius) >= 0;
+    setCursor(overNode ? Qt::OpenHandCursor : Qt::ArrowCursor);
+}
+
+void GraphWidget::mouseReleaseEvent(QMouseEvent *event) {
+    if (event->button() == Qt::LeftButton) {
+        m_pressedNode = -1;
+        if (m_dragging) {
+            m_dragging = false;
+            setCursor(Qt::OpenHandCursor);
+        }
+    }
+    QFrame::mouseReleaseEvent(event);
+}
+
+void GraphWidget::contextMenuEvent(QContextMenuEvent *event) {
+    if (!m_graph) return;
+    const int node = nodeNear(*m_graph, canvasGeometry(), event->pos(), nodeRadius);
+    if (node >= 0) emit nodeMenuRequested(node, event->globalPos());
 }

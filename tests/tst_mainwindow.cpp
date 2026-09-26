@@ -10,7 +10,10 @@
 #include <QTimer>
 #include <QValidator>
 
+#include "Graph.h"
 #include "GraphWidget.h"
+#include <QContextMenuEvent>
+#include <QMenu>
 #include "MainWindow.h"
 #include "ResultBanner.h"
 
@@ -250,6 +253,64 @@ private slots:
         QString good("q");
         int pos = 0;
         QCOMPARE(v->validate(good, pos), QValidator::Acceptable);
+    }
+    void edges_removeAndUpdateWeight() {
+        addNodes(2);
+        get<QComboBox>("cbEdgeFrom")->setCurrentText("A");
+        get<QComboBox>("cbEdgeTo")->setCurrentText("B");
+        QVERIFY(!button("btnRemoveEdge")->isEnabled());
+        QCOMPARE(button("btnRemoveEdge")->toolTip(), QString("No existe una arista de A a B."));
+        QCOMPARE(button("btnAddEdge")->text(), QString("Agregar arista"));
+        addEdge("A", "B", "4");
+        QCOMPARE(button("btnAddEdge")->text(), QString("Cambiar peso"));
+        QVERIFY(button("btnRemoveEdge")->isEnabled());
+        button("btnRemoveEdge")->click();
+        QVERIFY(!button("btnRemoveEdge")->isEnabled());
+        calculate("A", "B");
+        QCOMPARE(banner()->title(), QString("No hay camino de A a B"));
+    }
+
+    void drag_movesNodeAndFixesIt() {
+        auto *canvas = get<GraphWidget>("graphView");
+        addNodes(1);
+        const Graph *g = canvas->graph();
+        const QPoint start = canvas->canvasGeometry().toPixel(g->node(0).pos).toPoint();
+        const QPoint end(200, 300);
+        QTest::mousePress(canvas, Qt::LeftButton, {}, start);
+        QMouseEvent move(QEvent::MouseMove, QPointF(end), canvas->mapToGlobal(QPointF(end)),
+                         Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QApplication::sendEvent(canvas, &move);
+        QTest::mouseRelease(canvas, Qt::LeftButton, {}, end);
+        QVERIFY(!g->node(0).autoPlaced);
+        const QPointF moved = g->node(0).pos;
+        QVERIFY(QLineF(canvas->canvasGeometry().toPixel(moved), QPointF(end)).length() < 1.0);
+        addNodes(3); // se reparten los nuevos; el arrastrado no se mueve
+        QCOMPARE(g->node(0).pos, moved);
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 4); // soltar no creó nodos
+    }
+
+    void contextMenu_removesAnyNodeWithConfirmation() {
+        auto *canvas = get<GraphWidget>("graphView");
+        addNodes(3);
+        addEdge("A", "B", "1");
+        addEdge("B", "C", "1");
+        const QPoint onB = canvas->canvasGeometry().toPixel(canvas->graph()->node(1).pos).toPoint();
+        QString confirmTitle;
+        QTimer::singleShot(0, [&] {
+            auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget());
+            QVERIFY2(menu, "se esperaba el menú del nodo");
+            QCOMPARE(menu->actions().first()->text(), QString("Eliminar nodo «B»"));
+            answerNextDialog("Eliminar nodo", &confirmTitle);
+            menu->setActiveAction(menu->actions().first());
+            QTest::keyClick(menu, Qt::Key_Return);
+        });
+        QContextMenuEvent ev(QContextMenuEvent::Mouse, onB, canvas->mapToGlobal(onB));
+        QApplication::sendEvent(canvas, &ev);
+        QCOMPARE(confirmTitle, QString("¿Eliminar el nodo «B»?"));
+        auto *origin = get<QComboBox>("cbOrigin");
+        QCOMPARE(origin->count(), 2);
+        QCOMPARE(origin->itemText(0), QString("A"));
+        QCOMPARE(origin->itemText(1), QString("C"));
     }
 };
 

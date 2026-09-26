@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1100</width>
-    <height>700</height>
+    <height>780</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -63,19 +63,29 @@
      </layout>
     </item>
     <item>
-     <widget class="QWidget" name="panelSide">
+     <widget class="QScrollArea" name="scrollSide">
       <property name="minimumSize">
        <size>
-        <width>280</width>
+        <width>300</width>
         <height>0</height>
        </size>
       </property>
       <property name="maximumSize">
        <size>
-        <width>280</width>
+        <width>300</width>
         <height>16777215</height>
        </size>
       </property>
+      <property name="frameShape">
+       <enum>QFrame::NoFrame</enum>
+      </property>
+      <property name="horizontalScrollBarPolicy">
+       <enum>Qt::ScrollBarAlwaysOff</enum>
+      </property>
+      <property name="widgetResizable">
+       <bool>true</bool>
+      </property>
+      <widget class="QWidget" name="panelSide">
       <layout class="QVBoxLayout" name="layoutSide">
        <property name="spacing">
         <number>10</number>
@@ -87,7 +97,7 @@
         <number>0</number>
        </property>
        <property name="rightMargin">
-        <number>0</number>
+        <number>6</number>
        </property>
        <property name="bottomMargin">
         <number>0</number>
@@ -181,7 +191,7 @@
           <item row="5" column="0" colspan="2">
            <widget class="QLabel" name="lblNodeHint">
             <property name="text">
-             <string>También puede hacer clic en el lienzo para colocar un nodo.</string>
+             <string>En el lienzo: clic para colocar un nodo, arrastrar para moverlo, clic derecho para eliminarlo.</string>
             </property>
             <property name="wordWrap">
              <bool>true</bool>
@@ -256,6 +266,13 @@
              <widget class="QPushButton" name="btnAddEdge">
               <property name="text">
                <string>Agregar arista</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btnRemoveEdge">
+              <property name="text">
+               <string>Quitar</string>
               </property>
              </widget>
             </item>
@@ -360,6 +377,7 @@
         </spacer>
        </item>
       </layout>
+      </widget>
      </widget>
     </item>
    </layout>
