@@ -8,6 +8,7 @@ out/
 .idea/
 .vscode/
 *.user
+CMakeUserPresets.json
 
 # CMake
 CMakeCache.txt

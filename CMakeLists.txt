@@ -51,16 +51,27 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 # ------------------------------------------------------------
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Widgets)
 
+# ------------------------------------------------------------
+# ⚠️ Advertencias del compilador
+# ------------------------------------------------------------
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
+elseif (MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /W4)
+endif()
+
 if (WIN32)
-    # Encuentra windeployqt en el bin de Qt (usamos CMAKE_PREFIX_PATH del preset)
-    find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${CMAKE_PREFIX_PATH}/bin")
+    # Busca windeployqt junto a qmake de la instalación de Qt encontrada
+    get_target_property(QT_QMAKE_LOCATION Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(QT_BIN_DIR "${QT_QMAKE_LOCATION}" DIRECTORY)
+    find_program(WINDEPLOYQT_EXECUTABLE NAMES windeployqt windeployqt6 HINTS "${QT_BIN_DIR}")
     if (WINDEPLOYQT_EXECUTABLE)
         add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
                 COMMAND "${WINDEPLOYQT_EXECUTABLE}" --compiler-runtime
                 "$<TARGET_FILE:${PROJECT_NAME}>"
                 COMMENT "windeployqt: copiando DLLs de Qt y runtime de MinGW junto al .exe")
     else()
-        message(WARNING "No se encontró windeployqt en ${CMAKE_PREFIX_PATH}/bin")
+        message(WARNING "No se encontró windeployqt en ${QT_BIN_DIR}")
     endif()
 endif()
 

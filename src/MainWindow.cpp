@@ -445,7 +445,7 @@ void MainWindow::runBellmanFord(int src, int dest) {
         
         if(!cycle_path.isEmpty()) {
             double cycle_weight = 0;
-            for(size_t i = 0; i < cycle_path.size() - 1; ++i) {
+            for (qsizetype i = 0; i + 1 < cycle_path.size(); ++i) {
                 cycle_weight += adj[cycle_path[i]][cycle_path[i+1]];
             }
 
@@ -530,7 +530,7 @@ void MainWindow::runFloydWarshall(int src, int dest) {
                 cycle_path.append(start_node);
 
                 double cycle_weight = 0;
-                for(size_t j = 0; j < cycle_path.size() - 1; ++j) {
+                for (qsizetype j = 0; j + 1 < cycle_path.size(); ++j) {
                     cycle_weight += adj[cycle_path[j]][cycle_path[j+1]];
                 }
 
