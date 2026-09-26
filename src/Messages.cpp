@@ -102,6 +102,21 @@ QString addEdgeText(bool exists) {
     return exists ? QStringLiteral("Cambiar peso") : QStringLiteral("Agregar arista");
 }
 
+QString edgeExists(const QString &edge, double weight) {
+    return QStringLiteral("La arista %1 ya existe con peso %2. «Cambiar peso» la reemplaza.")
+            .arg(edge, number(weight));
+}
+
+QString edgeSameWeight(const QString &edge, double weight) {
+    return QStringLiteral("La arista %1 ya tiene peso %2. Escriba otro peso para cambiarlo.")
+            .arg(edge, number(weight));
+}
+
+Message edgeUpdated(const QString &edge, double oldWeight, double newWeight) {
+    return {QStringLiteral("Peso de %1 cambiado: %2 → %3").arg(edge, number(oldWeight), number(newWeight)),
+            QStringLiteral("Pulse «Calcular» para obtener el camino con el nuevo peso.")};
+}
+
 // ---------- Menú del nodo ----------
 QString removeNodeAction(const QString &name) {
     return QStringLiteral("Eliminar nodo «%1»").arg(name);

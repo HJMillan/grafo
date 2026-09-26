@@ -79,6 +79,8 @@ void MainWindow::applyTheme() {
         l->setFont(Theme::caption());
         l->setProperty("role", "error");
     }
+    ui->lblEdgeInfo->setFont(Theme::caption());
+    ui->lblEdgeInfo->setProperty("role", "secondary");
     ui->lblAlgoWarning->setFont(Theme::caption());
     ui->lblAlgoWarning->setProperty("role", "warning");
     for (QFrame *f : {ui->sepBuild, ui->sepEdge, ui->sepFooter}) f->setProperty("role", "separator");
@@ -300,9 +302,15 @@ void MainWindow::onAddEdge() {
     if (from < 0 || to < 0 || !w.value) return; // el botón ya estaba desactivado
 
     const QString label = Msg::edge(graph, {from, to, *w.value});
-    pushUndo(graph.hasEdge(from, to) ? Msg::undoChangeWeight(label) : Msg::undoAddEdge(label));
+    const std::optional<double> previous = graph.edge(from, to);
+    pushUndo(previous ? Msg::undoChangeWeight(label) : Msg::undoAddEdge(label));
     graph.setEdge(from, to, *w.value);
     graphChanged();
+    if (previous) {
+        const Msg::Message m = Msg::edgeUpdated(label, *previous, *w.value);
+        ui->resultBanner->setMessage(ResultBanner::Info, m.title, m.text);
+        resultShown = true; // el próximo cambio reemplaza este aviso
+    }
 }
 
 void MainWindow::onRemoveEdge() {
@@ -396,8 +404,25 @@ void MainWindow::updateControls() {
 
     const WeightCheck w = checkWeight();
     setFieldError(ui->txtWeight, ui->lblWeightError, hasNodes ? w.error : QString());
+
+    // Si la arista ya existe se informa su peso; con el mismo peso no hay nada que cambiar.
+    QString edgeInfo;
+    QString sameWeight;
+    if (edgeExists && w.error.isEmpty()) {
+        const double current = *graph.edge(from, to);
+        const QString label = Msg::edge(graph, {from, to, current});
+        if (w.value && *w.value == current)
+            sameWeight = edgeInfo = Msg::edgeSameWeight(label, current);
+        else
+            edgeInfo = Msg::edgeExists(label, current);
+    }
+    ui->lblEdgeInfo->setText(edgeInfo);
+    ui->lblEdgeInfo->setVisible(!edgeInfo.isEmpty());
+
     if (!hasNodes)
         setButtonEnabled(ui->btnAddEdge, false, Msg::needsNodesForEdge());
+    else if (!sameWeight.isEmpty())
+        setButtonEnabled(ui->btnAddEdge, false, sameWeight);
     else
         setButtonEnabled(ui->btnAddEdge, w.value.has_value(), w.error);
 

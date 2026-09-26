@@ -39,6 +39,9 @@ QString nodeOverlap();
 // ---------- Aristas ----------
 QString edgeMissing(const QString &from, const QString &to);
 QString addEdgeText(bool exists);   // «Agregar arista» o «Cambiar peso»
+QString edgeExists(const QString &edge, double weight);
+QString edgeSameWeight(const QString &edge, double weight);
+Message edgeUpdated(const QString &edge, double oldWeight, double newWeight);
 
 // ---------- Menú del nodo ----------
 QString removeNodeAction(const QString &name);

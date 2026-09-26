@@ -301,6 +301,13 @@
             </widget>
            </item>
            <item>
+            <widget class="QLabel" name="lblEdgeInfo">
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
             <layout class="QHBoxLayout" name="layoutEdgeActions">
              <item>
               <widget class="QPushButton" name="btnAddEdge">

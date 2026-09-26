@@ -180,7 +180,7 @@ private slots:
         addEdge("A", "B", "1");
         calculate("A", "B");
         QCOMPARE(banner()->kind(), ResultBanner::Success);
-        addEdge("A", "B", "3");
+        addNodes(1);
         QCOMPARE(banner()->title(), QString("El grafo cambió"));
     }
 
@@ -391,6 +391,39 @@ private slots:
         button("btnCalculate")->setFocus(); // en un campo de texto, Ctrl+Z deshace lo escrito
         QTest::keyClick(QApplication::focusWidget(), Qt::Key_Z, Qt::ControlModifier);
         QCOMPARE(get<QComboBox>("cbOrigin")->count(), 1);
+    }
+    // ---------- Arista existente y formato de pesos ----------
+    void edges_existingEdgeIsExplained() {
+        addNodes(2);
+        addEdge("A", "B", "4");
+        QLabel *info = get<QLabel>("lblEdgeInfo");
+        get<QLineEdit>("txtWeight")->setText("4");
+        QVERIFY(!info->isHidden());
+        QCOMPARE(info->text(), QString("La arista A–B ya tiene peso 4. Escriba otro peso para cambiarlo."));
+        QVERIFY(!button("btnAddEdge")->isEnabled());
+        QCOMPARE(button("btnAddEdge")->toolTip(), info->text());
+        get<QLineEdit>("txtWeight")->setText("6");
+        QVERIFY(info->text().startsWith("La arista A–B ya existe con peso 4."));
+        QVERIFY(button("btnAddEdge")->isEnabled());
+        button("btnAddEdge")->click();
+        QCOMPARE(banner()->title(), QString("Peso de A–B cambiado: 4 → 6"));
+        // En sentido contrario es la misma arista (no dirigido)
+        get<QComboBox>("cbEdgeFrom")->setCurrentText("B");
+        get<QComboBox>("cbEdgeTo")->setCurrentText("A");
+        QVERIFY(info->text().contains("ya tiene peso 6"));
+        // Otra pareja: sin aviso
+        get<QComboBox>("cbEdgeTo")->setCurrentText("B");
+        QVERIFY(info->isHidden());
+    }
+
+    void weights_integersWithoutDecimals() {
+        addNodes(3);
+        addEdge("A", "B", "4.0");
+        addEdge("B", "C", "0,50");
+        calculate("A", "B");
+        QCOMPARE(banner()->title(), QString("Distancia de A a B: 4"));
+        calculate("A", "C");
+        QCOMPARE(banner()->title(), QString("Distancia de A a C: 4,5"));
     }
 };
 
