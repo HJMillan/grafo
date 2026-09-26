@@ -223,6 +223,22 @@ private slots:
         button("btnClearAll")->click();
         QCOMPARE(get<QComboBox>("cbOrigin")->count(), 0);
     }
+    void canvas_clickCreatesNodeWhereFree() {
+        auto *canvas = get<GraphWidget>("graphView");
+        QTest::mouseClick(canvas, Qt::LeftButton, {}, QPoint(100, 100));
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 1);
+        // Sobre el nodo: no crea otro.
+        QTest::mouseClick(canvas, Qt::LeftButton, {}, QPoint(105, 100));
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 1);
+        // Pegado al nodo: no cabe y lo explica.
+        QTest::mouseClick(canvas, Qt::LeftButton, {}, QPoint(135, 100));
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 1);
+        QCOMPARE(banner()->kind(), ResultBanner::Warning);
+        QCOMPARE(banner()->title(), QString("No se puede colocar el nodo"));
+        // Lejos: se crea.
+        QTest::mouseClick(canvas, Qt::LeftButton, {}, QPoint(300, 200));
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 2);
+    }
 };
 
 QTEST_MAIN(TestMainWindow)

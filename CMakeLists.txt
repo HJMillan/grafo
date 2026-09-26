@@ -42,6 +42,7 @@ add_library(graphcore STATIC
         src/Graph.cpp src/Graph.h
         src/ShortestPath.cpp src/ShortestPath.h
         src/Weight.cpp src/Weight.h
+        src/Layout.cpp src/Layout.h
 )
 target_include_directories(graphcore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(graphcore PUBLIC Qt6::Core)

@@ -42,6 +42,10 @@ GraphWidget::GraphWidget(QWidget *parent) : QFrame(parent) {
     setAttribute(Qt::WA_OpaquePaintEvent);
 }
 
+CanvasGeometry GraphWidget::canvasGeometry() const {
+    return {QSizeF(size()), nodeRadius + 4.0};
+}
+
 void GraphWidget::setGraph(const Graph *graph) {
     m_graph = graph;
     update();
@@ -74,11 +78,12 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
 
     if (!m_graph) return;
     const auto &nodes = m_graph->nodes();
+    const CanvasGeometry geo = canvasGeometry();
 
     // Aristas
     for (const DrawEdge &e : buildDrawEdges(*m_graph)) {
-        const QPointF ap = nodes[e.from].pos;
-        const QPointF bp = nodes[e.to].pos;
+        const QPointF ap = geo.toPixel(nodes[e.from].pos);
+        const QPointF bp = geo.toPixel(nodes[e.to].pos);
 
         const bool hi = m_highlighted.contains({e.from, e.to}) ||
                         (!e.directed && m_highlighted.contains({e.to, e.from})) ||
@@ -202,10 +207,11 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
     g.setFont(nFont);
 
     for (const Graph::Node &n : nodes) {
-        QRectF circle(n.pos.x() - nodeRadius, n.pos.y() - nodeRadius,
+        const QPointF c = geo.toPixel(n.pos);
+        QRectF circle(c.x() - nodeRadius, c.y() - nodeRadius,
                       nodeRadius * 2, nodeRadius * 2);
 
-        QRadialGradient radial(n.pos, nodeRadius);
+        QRadialGradient radial(c, nodeRadius);
         radial.setColorAt(0.0, QColor("#f0f2f6"));
         radial.setColorAt(0.7, QColor("#e4e7ed"));
         radial.setColorAt(1.0, QColor("#d8dbe2"));
@@ -220,8 +226,16 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
 }
 
 void GraphWidget::mousePressEvent(QMouseEvent *event) {
-    if (event->button() == Qt::LeftButton) {
-        emit canvasClicked(event->pos());
+    if (event->button() == Qt::LeftButton && m_graph) {
+        const QPointF p = event->position();
+        const CanvasGeometry geo = canvasGeometry();
+        if (nodeNear(*m_graph, geo, p, nodeRadius) >= 0) {
+            // Clic sobre un nodo: no crea otro encima.
+        } else if (nodeNear(*m_graph, geo, p, minNodeDistance) >= 0) {
+            emit placementBlocked();
+        } else {
+            emit canvasClicked(geo.toNormalized(p));
+        }
     }
     QFrame::mousePressEvent(event);
 }

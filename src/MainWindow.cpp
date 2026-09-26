@@ -2,6 +2,7 @@
 #include "ui_MainWindow.h"
 #include "Messages.h"
 #include "Weight.h"
+#include "Layout.h"
 
 #include <QAbstractButton>
 #include <QComboBox>
@@ -14,7 +15,6 @@
 #include <QCheckBox>
 #include <QSignalBlocker>
 #include <QStyle>
-#include <cmath>
 
 namespace {
 const char *kWindowStyle =
@@ -90,6 +90,7 @@ void MainWindow::setupConnections() {
     connect(ui->btnCalculate, &QPushButton::clicked, this, &MainWindow::onCalculate);
     connect(ui->chkDirected, &QCheckBox::toggled, this, &MainWindow::onDirectedToggled);
     connect(ui->graphView, &GraphWidget::canvasClicked, this, &MainWindow::onCanvasClicked);
+    connect(ui->graphView, &GraphWidget::placementBlocked, this, &MainWindow::onPlacementBlocked);
 
     // Validación mientras se escribe o cambia el contexto
     connect(ui->txtNodeName, &QLineEdit::textChanged, this, &MainWindow::updateControls);
@@ -111,18 +112,6 @@ QString MainWindow::nextSuggestedName() const {
     return {};
 }
 
-QPoint MainWindow::suggestedPosition(int idx) const {
-    const QRect r = ui->graphView->rect();
-    const QPoint center = r.center();
-    const int radius = qMax(80, qMin(r.width(), r.height()) / 2 - 40);
-    const int denom = qMax(1, graph.nodeCount() + 1);
-    constexpr double PI = 3.14159265358979323846;
-    const double angle = 2.0 * PI * (idx % denom) / denom;
-    const int x = center.x() + static_cast<int>(radius * std::cos(angle));
-    const int y = center.y() + static_cast<int>(radius * std::sin(angle));
-    return QPoint(x, y);
-}
-
 // Devuelve el error que impide agregar un nodo con el nombre escrito
 // (o con el automático, si el campo está vacío), o una cadena vacía.
 QString MainWindow::nodeNameError(const QString &typed) const {
@@ -140,7 +129,7 @@ QString MainWindow::nodeNameError(const QString &typed) const {
     return {};
 }
 
-bool MainWindow::addNode(const QPoint &pos, bool autoPlaced) {
+bool MainWindow::addNode(const QPointF &pos, bool autoPlaced) {
     const QString typed = ui->txtNodeName->text().trimmed();
     if (!nodeNameError(typed).isEmpty()) {
         updateControls(); // el error ya está visible bajo el campo
@@ -149,6 +138,7 @@ bool MainWindow::addNode(const QPoint &pos, bool autoPlaced) {
     }
     const QString name = typed.isEmpty() ? nextSuggestedName() : typed;
     graph.addNode(name, pos, autoPlaced);
+    if (autoPlaced) relayoutAutoPlaced();
     ui->txtNodeName->clear();
     refreshNodeSelectors();
     graphChanged();
@@ -170,17 +160,29 @@ void MainWindow::refreshNodeSelectors() {
     fillCombo(ui->cbDestination);
 }
 
-void MainWindow::onCanvasClicked(const QPoint &p) {
-    addNode(p, false);
+void MainWindow::onCanvasClicked(const QPointF &normalizedPos) {
+    addNode(normalizedPos, false);
+}
+
+void MainWindow::onPlacementBlocked() {
+    ui->resultBanner->setMessage(ResultBanner::Warning, QStringLiteral("No se puede colocar el nodo"),
+                                 Msg::nodeOverlap());
+    resultShown = true;
 }
 
 void MainWindow::onAddNode() {
-    addNode(suggestedPosition(graph.nodeCount()), true);
+    addNode(QPointF(0.5, 0.5), true); // la posición final la decide relayoutAutoPlaced
+}
+
+void MainWindow::relayoutAutoPlaced() {
+    layoutAutoPlaced(graph, ui->graphView->canvasGeometry(), GraphWidget::minNodeDistance);
 }
 
 void MainWindow::onRemoveLast() {
     if (graph.nodeCount() == 0) return;
+    const bool wasAuto = graph.node(graph.nodeCount() - 1).autoPlaced;
     graph.removeNode(graph.nodeCount() - 1);
+    if (wasAuto) relayoutAutoPlaced();
     refreshNodeSelectors();
     graphChanged();
 }

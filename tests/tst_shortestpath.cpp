@@ -4,6 +4,8 @@
 #include "Graph.h"
 #include "ShortestPath.h"
 #include "Weight.h"
+#include "Layout.h"
+#include <QLineF>
 
 namespace {
 // Crea un grafo con nodos A, B, C... y las aristas indicadas como "AB:2.5".
@@ -263,6 +265,46 @@ private slots:
         const WeightParse p = parseWeight(text);
         QCOMPARE(int(p.error), error);
         if (p.ok()) QCOMPARE(p.value, value);
+    }
+    // ---------- Reparto de nodos en el lienzo ----------
+    void layout_geometryRoundTripAndClamp() {
+        const CanvasGeometry geo{QSizeF(800, 600), 26};
+        const QPointF p = geo.toPixel({0.25, 0.75});
+        QCOMPARE(geo.toNormalized(p), QPointF(0.25, 0.75));
+        QCOMPARE(geo.toNormalized({-50, 9999}), QPointF(0.0, 1.0)); // siempre dentro del lienzo
+    }
+
+    void layout_autoNodesNeverOverlap_data() {
+        QTest::addColumn<QSizeF>("canvas");
+        QTest::newRow("ventana normal") << QSizeF(1000, 700);
+        QTest::newRow("ventana mínima") << QSizeF(480, 380);
+    }
+    void layout_autoNodesNeverOverlap() {
+        QFETCH(QSizeF, canvas);
+        const CanvasGeometry geo{canvas, 26};
+        Graph g;
+        for (int k = 0; k < Graph::MaxNodes; ++k) {
+            g.addNode(QString(QChar('A' + k)), {0.5, 0.5}, true);
+            layoutAutoPlaced(g, geo, 50);
+            for (int i = 0; i < g.nodeCount(); ++i)
+                for (int j = i + 1; j < g.nodeCount(); ++j) {
+                    const double d = QLineF(geo.toPixel(g.node(i).pos), geo.toPixel(g.node(j).pos)).length();
+                    QVERIFY2(d >= 44, qPrintable(QString("%1 nodos: %2 y %3 a %4 px")
+                                                     .arg(g.nodeCount()).arg(i).arg(j).arg(d)));
+                }
+        }
+    }
+
+    void layout_userNodesStayAndAreAvoided() {
+        const CanvasGeometry geo{QSizeF(1000, 700), 26};
+        Graph g;
+        g.addNode("X", {0.5, 0.05}, false); // justo donde iría el primer nodo automático
+        for (int k = 0; k < 6; ++k) g.addNode(QString(QChar('A' + k)), {0.5, 0.5}, true);
+        layoutAutoPlaced(g, geo, 50);
+        QCOMPARE(g.node(0).pos, QPointF(0.5, 0.05));
+        const QPointF fixed = geo.toPixel(g.node(0).pos);
+        for (int i = 1; i < g.nodeCount(); ++i)
+            QVERIFY(QLineF(geo.toPixel(g.node(i).pos), fixed).length() >= 50);
     }
 };
 

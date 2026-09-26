@@ -2,7 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QPoint>
+#include <QPointF>
 #include <optional>
 #include "Graph.h"
 #include "ShortestPath.h"
@@ -26,7 +26,8 @@ private slots:
     void onAddNode();
     void onRemoveLast();
     void onClearAll();
-    void onCanvasClicked(const QPoint &p);
+    void onCanvasClicked(const QPointF &normalizedPos);
+    void onPlacementBlocked();
     void onAddEdge();
     void onCalculate();
     void onDirectedToggled(bool checked);
@@ -40,9 +41,9 @@ private:
 
     // Nodos
     QString nextSuggestedName() const;
-    QPoint suggestedPosition(int idx) const;
     QString nodeNameError(const QString &name) const;
-    bool addNode(const QPoint &pos, bool autoPlaced);
+    bool addNode(const QPointF &pos, bool autoPlaced);
+    void relayoutAutoPlaced();
     void refreshNodeSelectors();
 
     // Aristas
