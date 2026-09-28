@@ -15,6 +15,7 @@
 #include <QContextMenuEvent>
 #include <QMenu>
 #include "MainWindow.h"
+#include "Messages.h"
 #include "ResultBanner.h"
 
 namespace {
@@ -226,6 +227,13 @@ private slots:
         answerNextDialog("Borrar todo");
         button("btnClearAll")->click();
         QCOMPARE(get<QComboBox>("cbOrigin")->count(), 0);
+    }
+    void clearAll_messageUsesSingularAndPlural() {
+        const auto text = [](int nodes, int edges) { return Msg::confirmClearAll(nodes, edges).text; };
+        QVERIFY(text(1, 0).startsWith("Se eliminará 1 nodo."));
+        QVERIFY(text(1, 1).startsWith("Se eliminarán 1 nodo y 1 arista."));
+        QVERIFY(text(2, 0).startsWith("Se eliminarán 2 nodos."));
+        QVERIFY(text(3, 2).startsWith("Se eliminarán 3 nodos y 2 aristas."));
     }
     void canvas_clickCreatesNodeWhereFree() {
         auto *canvas = get<GraphWidget>("graphView");

@@ -3,6 +3,13 @@
 #include <QLocale>
 #include <QStringList>
 
+namespace {
+// «1 nodo», «3 nodos».
+QString count(int n, const char *singular, const char *plural) {
+    return QStringLiteral("%1 %2").arg(n).arg(QString::fromUtf8(n == 1 ? singular : plural));
+}
+}
+
 namespace Msg {
 
 // ---------- Formato ----------
@@ -243,9 +250,13 @@ Message confirmToUndirected(const Graph &g, const QVector<Graph::Edge> &asymmetr
 QString confirmToUndirectedAccept() { return QStringLiteral("Borrar aristas y cambiar"); }
 
 Message confirmClearAll(int nodes, int edges) {
+    // Con varios elementos el verbo va en plural; las aristas se omiten si no hay.
+    QString what = count(nodes, "nodo", "nodos");
+    if (edges > 0) what += QStringLiteral(" y ") + count(edges, "arista", "aristas");
+    const QString verb = nodes == 1 && edges == 0 ? QStringLiteral("Se eliminará")
+                                                  : QStringLiteral("Se eliminarán");
     return {QStringLiteral("¿Borrar todo el grafo?"),
-            QStringLiteral("Se eliminarán %1 nodos y %2 aristas. Puede recuperarlos con «Deshacer» (Ctrl+Z).")
-                    .arg(nodes).arg(edges)};
+            QStringLiteral("%1 %2. Puede recuperarlo todo con «Deshacer» (Ctrl+Z).").arg(verb, what)};
 }
 
 QString confirmClearAllAccept() { return QStringLiteral("Borrar todo"); }
