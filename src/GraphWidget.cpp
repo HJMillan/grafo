@@ -90,6 +90,11 @@ void GraphWidget::paintEvent(QPaintEvent *event) {
     drawNodes(g);
 }
 
+void GraphWidget::resizeEvent(QResizeEvent *event) {
+    QFrame::resizeEvent(event);
+    emit canvasResized();
+}
+
 void GraphWidget::drawEmptyState(QPainter &g) const {
     QFont titleFont = Theme::headline();
     titleFont.setPointSizeF(15.0);

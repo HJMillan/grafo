@@ -32,6 +32,7 @@ private slots:
     void onClearAll();
     void onCanvasClicked(const QPointF &normalizedPos);
     void onPlacementBlocked();
+    void onCanvasResized();
     void onAddEdge();
     void onRemoveEdge();
     void onNodeDragStarted(int index);

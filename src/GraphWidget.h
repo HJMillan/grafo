@@ -41,9 +41,12 @@ signals:
     void nodeDragged(int index, const QPointF &normalizedPos);
     // Clic derecho sobre un nodo.
     void nodeMenuRequested(int index, const QPoint &globalPos);
+    // El lienzo cambió de tamaño: los nodos automáticos pueden necesitar recolocarse.
+    void canvasResized();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;

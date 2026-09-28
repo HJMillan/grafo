@@ -239,6 +239,33 @@ private slots:
         QVERIFY(!button("btnAddNode")->isEnabled());
         QVERIFY(get<QLabel>("lblNodeError")->text().contains("52"));
     }
+    void resize_relayoutsAutoNodes() {
+        auto *canvas = get<GraphWidget>("graphView");
+        w->resize(1500, 800);
+        QTRY_VERIFY(canvas->width() > 1000);
+        addNodes(Graph::MaxNodes);
+        // Al volver a la ventana mínima los nodos se reparten de nuevo sin solaparse.
+        w->resize(w->minimumSize());
+        QTRY_VERIFY(canvas->width() < 800);
+        const Graph *g = canvas->graph();
+        const CanvasGeometry geo = canvas->canvasGeometry();
+        for (int i = 0; i < g->nodeCount(); ++i)
+            for (int j = i + 1; j < g->nodeCount(); ++j) {
+                const double d = QLineF(geo.toPixel(g->node(i).pos), geo.toPixel(g->node(j).pos)).length();
+                QVERIFY2(d >= GraphWidget::minNodeDistance - 0.01,
+                         qPrintable(QString("%1 y %2 a %3 px").arg(g->node(i).name, g->node(j).name).arg(d)));
+            }
+    }
+    void resize_keepsResult() {
+        addNodes(2);
+        addEdge("A", "B", "3");
+        calculate("A", "B");
+        const QString title = banner()->title();
+        w->resize(1400, 800);
+        QTRY_VERIFY(get<GraphWidget>("graphView")->width() > 900);
+        QCOMPARE(banner()->kind(), ResultBanner::Success);
+        QCOMPARE(banner()->title(), title);
+    }
     void clearAll_asksForConfirmation() {
         addNodes(2);
         answerNextDialog("Cancelar");

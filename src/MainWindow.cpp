@@ -130,6 +130,7 @@ void MainWindow::setupConnections() {
     connect(ui->graphView, &GraphWidget::nodeDragStarted, this, &MainWindow::onNodeDragStarted);
     connect(ui->graphView, &GraphWidget::nodeDragged, this, &MainWindow::onNodeDragged);
     connect(ui->graphView, &GraphWidget::nodeMenuRequested, this, &MainWindow::onNodeMenuRequested);
+    connect(ui->graphView, &GraphWidget::canvasResized, this, &MainWindow::onCanvasResized);
 
     // Validación mientras se escribe o cambia el contexto
     connect(ui->txtNodeName, &QLineEdit::textChanged, this, &MainWindow::updateControls);
@@ -220,6 +221,15 @@ void MainWindow::onAddNode() {
 
 void MainWindow::relayoutAutoPlaced() {
     layoutAutoPlaced(graph, ui->graphView->canvasGeometry(), GraphWidget::minNodeDistance);
+}
+
+void MainWindow::onCanvasResized() {
+    // Las posiciones son relativas al lienzo: al achicarlo los nodos automáticos
+    // se acercan y hay que repartirlos otra vez. Como mover nodos no cambia
+    // distancias, ni se invalida el resultado ni se guarda un paso de deshacer.
+    // Los nodos que colocó el usuario no se mueven.
+    relayoutAutoPlaced();
+    ui->graphView->update();
 }
 
 void MainWindow::onRemoveLast() {
@@ -357,6 +367,7 @@ void MainWindow::onUndo() {
     if (undoStack.isEmpty()) return;
     const UndoEntry entry = undoStack.takeLast();
     graph = entry.graph;
+    relayoutAutoPlaced(); // la copia pudo guardarse con el lienzo de otro tamaño
     {
         QSignalBlocker block(ui->chkDirected);
         ui->chkDirected->setChecked(graph.isDirected());
