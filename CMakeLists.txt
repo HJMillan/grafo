@@ -79,7 +79,14 @@ if (WIN32)
         add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
                 COMMAND "${WINDEPLOYQT_EXECUTABLE}" --compiler-runtime
                 "$<TARGET_FILE:${PROJECT_NAME}>"
-                COMMENT "windeployqt: copiando DLLs de Qt y runtime de MinGW junto al .exe")
+                # Con el Qt de MSYS2 faltan además sus dependencias (libstdc++, ICU…)
+                COMMAND "${CMAKE_COMMAND}"
+                -DEXE=$<TARGET_FILE:${PROJECT_NAME}>
+                -DSEARCH_DIR=${QT_BIN_DIR}
+                -DOBJDUMP=${CMAKE_OBJDUMP}
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CopyRuntimeDeps.cmake"
+                COMMENT "windeployqt: copiando DLLs de Qt y runtime de MinGW junto al .exe"
+                VERBATIM)
     else()
         message(WARNING "No se encontró windeployqt en ${QT_BIN_DIR}")
     endif()
