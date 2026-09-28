@@ -10,7 +10,9 @@
 // Solo depende de QtCore para poder probarse sin interfaz gráfica.
 class Graph {
 public:
-    static constexpr int MaxNodes = 26;
+    // Una letra por nodo, mayúscula o minúscula: A–Z y a–z. Con la ventana
+    // mínima (1100×740) el reparto automático aún los separa todos.
+    static constexpr int MaxNodes = 52;
 
     struct Node {
         QString name;

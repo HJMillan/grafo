@@ -33,7 +33,6 @@ QString weightNegativeDijkstra();
 QString nodeNameInvalid();
 QString nodeNameDuplicate(const QString &name, const QString &alternative);
 QString nodeLimit(int max);
-QString nodeNoFreeName(bool uppercase);
 QString nodeOverlap();
 
 // ---------- Aristas ----------

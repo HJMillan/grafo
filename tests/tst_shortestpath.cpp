@@ -277,14 +277,14 @@ private slots:
     void layout_autoNodesNeverOverlap_data() {
         QTest::addColumn<QSizeF>("canvas");
         QTest::newRow("ventana normal") << QSizeF(1000, 700);
-        QTest::newRow("ventana mínima") << QSizeF(480, 380);
+        QTest::newRow("ventana mínima") << QSizeF(708, 516); // lienzo con la ventana en 1100×740
     }
     void layout_autoNodesNeverOverlap() {
         QFETCH(QSizeF, canvas);
         const CanvasGeometry geo{canvas, 26};
         Graph g;
         for (int k = 0; k < Graph::MaxNodes; ++k) {
-            g.addNode(QString(QChar('A' + k)), {0.5, 0.5}, true);
+            g.addNode(QString::number(k), {0.5, 0.5}, true);
             layoutAutoPlaced(g, geo, 50);
             for (int i = 0; i < g.nodeCount(); ++i)
                 for (int j = i + 1; j < g.nodeCount(); ++j) {

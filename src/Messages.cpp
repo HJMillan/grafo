@@ -88,14 +88,6 @@ QString nodeLimit(int max) {
     return QStringLiteral("Se alcanzó el máximo de %1 nodos. Borre alguno para agregar otro.").arg(max);
 }
 
-QString nodeNoFreeName(bool uppercase) {
-    return uppercase
-            ? QStringLiteral("Ya se usaron todas las letras mayúsculas. Desmarque «Mayúsculas» "
-                             "o escriba un nombre.")
-            : QStringLiteral("Ya se usaron todas las letras minúsculas. Marque «Mayúsculas» "
-                             "o escriba un nombre.");
-}
-
 QString nodeOverlap() {
     return QStringLiteral("Ya hay un nodo en ese lugar. Haga clic en un espacio libre del lienzo.");
 }

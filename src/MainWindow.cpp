@@ -142,9 +142,11 @@ void MainWindow::setupConnections() {
 }
 
 // --------------------- Nodos ---------------------
+// Primera letra libre del caso marcado; si ya se usaron todas, del otro caso.
 QString MainWindow::nextSuggestedName() const {
-    const QString alphabet = ui->chkUppercase->isChecked() ? "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                                                           : "abcdefghijklmnopqrstuvwxyz";
+    const QString upper = QStringLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    const QString lower = upper.toLower();
+    const QString alphabet = ui->chkUppercase->isChecked() ? upper + lower : lower + upper;
     for (const QChar c : alphabet) {
         if (graph.indexOf(QString(c)) < 0) return QString(c);
     }
@@ -156,8 +158,9 @@ QString MainWindow::nextSuggestedName() const {
 QString MainWindow::nodeNameError(const QString &typed) const {
     if (graph.nodeCount() >= Graph::MaxNodes) return Msg::nodeLimit(Graph::MaxNodes);
     if (typed.isEmpty()) {
-        return nextSuggestedName().isEmpty() ? Msg::nodeNoFreeName(ui->chkUppercase->isChecked())
-                                             : QString();
+        // Hay tantas letras como MaxNodes: por debajo del límite siempre queda una libre.
+        Q_ASSERT(!nextSuggestedName().isEmpty());
+        return {};
     }
     const QChar c = typed.at(0);
     const bool asciiLetter = (c >= u'A' && c <= u'Z') || (c >= u'a' && c <= u'z');

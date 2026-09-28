@@ -12,8 +12,8 @@
   </property>
   <property name="minimumSize">
    <size>
-    <width>900</width>
-    <height>600</height>
+    <width>1100</width>
+    <height>740</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -193,7 +193,7 @@
                 <string>A–Z</string>
                </property>
                <property name="toolTip">
-                <string>Mayúsculas para el nombre automático (solo cuando el campo está vacío).</string>
+                <string>Mayúsculas para el nombre automático (solo cuando el campo está vacío). Cuando se acaban, se sigue con las del otro caso.</string>
                </property>
                <property name="checked">
                 <bool>true</bool>

@@ -219,6 +219,26 @@ private slots:
         QCOMPARE(banner()->kind(), ResultBanner::Success);
     }
 
+    void nodes_autoNameContinuesWithOtherCase() {
+        QVERIFY(get<QCheckBox>("chkUppercase")->isChecked());
+        addNodes(27);
+        QCOMPARE(get<QComboBox>("cbOrigin")->itemText(25), QString("Z"));
+        QCOMPARE(get<QComboBox>("cbOrigin")->itemText(26), QString("a"));
+    }
+    void nodes_limitReached() {
+        addNodes(Graph::MaxNodes);
+        QCOMPARE(get<QComboBox>("cbOrigin")->count(), 52);
+        QVERIFY(!button("btnAddNode")->isEnabled());
+        QVERIFY(button("btnAddNode")->toolTip().contains("52"));
+        // Aunque se escriba una letra, el límite sigue mandando.
+        button("btnRemoveLast")->click();
+        get<QLineEdit>("txtNodeName")->setText("z");
+        QVERIFY(button("btnAddNode")->isEnabled());
+        button("btnAddNode")->click();
+        get<QLineEdit>("txtNodeName")->setText("A");
+        QVERIFY(!button("btnAddNode")->isEnabled());
+        QVERIFY(get<QLabel>("lblNodeError")->text().contains("52"));
+    }
     void clearAll_asksForConfirmation() {
         addNodes(2);
         answerNextDialog("Cancelar");
