@@ -1,5 +1,12 @@
 #include "Graph.h"
 
+#include <QtGlobal>
+
+const Graph::Node &Graph::node(int i) const {
+    Q_ASSERT(isValid(i));
+    return m_nodes[i];
+}
+
 int Graph::indexOf(const QString &name) const {
     for (int i = 0; i < nodeCount(); ++i) {
         if (m_nodes[i].name == name) return i;
@@ -22,18 +29,18 @@ int Graph::addNode(const QString &name, const QPointF &pos, bool autoPlaced) {
 }
 
 void Graph::removeNode(int index) {
-    if (index < 0 || index >= nodeCount()) return;
+    if (!isValid(index)) return;
     m_nodes.removeAt(index);
     m_adj.removeAt(index);
     for (auto &row : m_adj) row.removeAt(index);
 }
 
 void Graph::setNodePos(int index, const QPointF &pos) {
-    if (index >= 0 && index < nodeCount()) m_nodes[index].pos = pos;
+    if (isValid(index)) m_nodes[index].pos = pos;
 }
 
 void Graph::setNodeAutoPlaced(int index, bool autoPlaced) {
-    if (index >= 0 && index < nodeCount()) m_nodes[index].autoPlaced = autoPlaced;
+    if (isValid(index)) m_nodes[index].autoPlaced = autoPlaced;
 }
 
 void Graph::clear() {
@@ -41,12 +48,24 @@ void Graph::clear() {
     m_adj.clear();
 }
 
+std::optional<double> Graph::edge(int from, int to) const {
+    Q_ASSERT(isValid(from) && isValid(to));
+    return m_adj[from][to];
+}
+
+bool Graph::hasEdge(int from, int to) const {
+    Q_ASSERT(isValid(from) && isValid(to));
+    return m_adj[from][to].has_value();
+}
+
 void Graph::setEdge(int from, int to, double weight) {
+    Q_ASSERT(isValid(from) && isValid(to));
     m_adj[from][to] = weight;
     if (!m_directed) m_adj[to][from] = weight;
 }
 
 void Graph::removeEdge(int from, int to) {
+    Q_ASSERT(isValid(from) && isValid(to));
     m_adj[from][to].reset();
     if (!m_directed) m_adj[to][from].reset();
 }

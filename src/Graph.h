@@ -25,7 +25,7 @@ public:
     };
 
     int nodeCount() const { return static_cast<int>(m_nodes.size()); }
-    const Node &node(int i) const { return m_nodes[i]; }
+    const Node &node(int i) const;
     const QVector<Node> &nodes() const { return m_nodes; }
     int indexOf(const QString &name) const;
     QVector<QString> names() const;
@@ -43,8 +43,8 @@ public:
     void setEdge(int from, int to, double weight);
     void removeEdge(int from, int to);
     void clearEdges();
-    std::optional<double> edge(int from, int to) const { return m_adj[from][to]; }
-    bool hasEdge(int from, int to) const { return m_adj[from][to].has_value(); }
+    std::optional<double> edge(int from, int to) const;
+    bool hasEdge(int from, int to) const;
 
     // Aristas para mostrar: en modo dirigido cada arco; en no dirigido
     // cada par una sola vez (from <= to), incluidos los lazos.
@@ -57,6 +57,8 @@ public:
     QVector<Edge> asymmetricArcs() const;  // arcos sin inverso, o con inverso de otro peso (una vez por pareja)
 
 private:
+    bool isValid(int i) const { return i >= 0 && i < nodeCount(); }
+
     QVector<Node> m_nodes;
     QVector<QVector<std::optional<double>>> m_adj;
     bool m_directed = false;
